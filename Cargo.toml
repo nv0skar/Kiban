@@ -1,0 +1,13 @@
+[package]
+name = "Kiban"
+description = "A language 🔡"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+language = { version = "0.0.1", path = "./language" }
+clap = { version = "4.1.1", features = ["string"]}
+annotate-snippets = { version = "0.9.1", features = ["color"]}
+
+[workspace]
+members = ["language"]
