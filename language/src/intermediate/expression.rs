@@ -15,10 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::{
+    check::{Check, Error},
     container::Scope,
     primitives::{Types, Value},
-    Check, Identifier,
+    Identifier,
 };
+
+use std::fmt::Display;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
@@ -31,12 +34,12 @@ pub enum Expression {
         rhs: Box<Self>,
     },
     CallFn {
-        function: Box<Self>,
+        target: Box<Self>,
         args: Vec<Self>,
     },
     TypeFn {
-        function: Box<Self>,
-        target: Identifier,
+        target: Box<Self>,
+        function: Identifier,
         args: Vec<Self>,
     },
     Access {
@@ -74,43 +77,98 @@ impl Expression {
 }
 
 impl Check for Expression {
-    fn check(&self) -> Result<(), String> {
+    fn check(&self, error_track: &mut Vec<Error>) {
         match self {
-            Expression::Scoped(scope) => scope.check(),
-            Expression::Unary(value) => value.check(),
+            Expression::Scoped(scope) => scope.check(error_track),
+            Expression::Unary(value) => value.check(error_track),
             Expression::Binary {
                 operator: _,
                 lhs,
                 rhs,
             } => {
-                lhs.check()?;
-                rhs.check()?;
-                Ok(())
+                lhs.check(error_track);
+                rhs.check(error_track);
             }
-            Expression::CallFn { function: id, args } => {
-                id.check()?;
+            Expression::CallFn { target: id, args } => {
+                id.check(error_track);
                 for arg in args {
-                    arg.check()?;
+                    arg.check(error_track);
                 }
-                Ok(())
             }
             Expression::TypeFn {
-                function: id,
-                target: _,
+                target: id,
+                function: _,
                 args,
             } => {
-                id.check()?;
+                id.check(error_track);
                 for arg in args {
-                    arg.check()?;
+                    arg.check(error_track);
                 }
-                Ok(())
             }
             Expression::Access { target, to } => {
-                target.check()?;
-                to.check()?;
-                Ok(())
+                target.check(error_track);
+                to.check(error_track);
             }
-            _ => Ok(()),
+            _ => (),
+        }
+    }
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expression::Reference(id) => write!(f, "{}", id),
+            Expression::Scoped(scope) => write!(f, "{}", scope),
+            Expression::Unary(value) => write!(f, "{}", value),
+            Expression::Binary { operator, lhs, rhs } => write!(f, "{} {} {}", lhs, operator, rhs),
+            Expression::CallFn {
+                target: function,
+                args,
+            } => write!(
+                f,
+                "{}({})",
+                function,
+                args.iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Expression::TypeFn {
+                target: function,
+                function: target,
+                args,
+            } => write!(
+                f,
+                "{}.{}({})",
+                target,
+                function,
+                args.iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Expression::Access { target, to } => write!(f, "{}.{}", target, to),
+        }
+    }
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operator::Addition => write!(f, "+"),
+            Operator::Substraction => write!(f, "-"),
+            Operator::Multiplication => write!(f, "*"),
+            Operator::Division => write!(f, "/"),
+            Operator::Exponentiation => write!(f, "^"),
+            Operator::Mod => write!(f, "%"),
+            Operator::Equal => write!(f, "=="),
+            Operator::NotEqual => write!(f, "!="),
+            Operator::And => write!(f, "&&"),
+            Operator::Or => write!(f, "||"),
+            Operator::Less => write!(f, "<"),
+            Operator::LessOrEqual => write!(f, "<="),
+            Operator::More => write!(f, ">"),
+            Operator::MoreOrEqual => write!(f, ">="),
         }
     }
 }

@@ -14,10 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{container::Callable, expression::Expression, Check, Defined, Identifier};
+use super::{
+    check::{Check, Error},
+    container::Callable,
+    expression::Expression,
+    lexis::{Defined, Identifier},
+};
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct Blend(pub Types);
+use std::fmt::Display;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Types {
@@ -76,10 +80,10 @@ impl Value {
 }
 
 impl Check for Value {
-    fn check(&self) -> Result<(), String> {
+    fn check(&self, error_track: &mut Vec<Error>) {
         match self {
-            Value::Fn(callable) => callable.check(),
-            _ => Ok(()),
+            Value::Fn(callable) => callable.check(error_track),
+            _ => (),
         }
     }
 }
@@ -87,5 +91,79 @@ impl Check for Value {
 impl PartialEq<Value> for Types {
     fn eq(&self, other: &Value) -> bool {
         self == &other.get_type()
+    }
+}
+
+impl Display for Types {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Types::Unknown => write!(f, "unknown"),
+            Types::Reference(id) => write!(f, "{}", id),
+            Types::Boolean => write!(f, "bool"),
+            Types::Integer => write!(f, "int"),
+            Types::Float => write!(f, "float"),
+            Types::String => write!(f, "string"),
+            Types::Vector(of_type) => write!(f, "vec<{}>", of_type),
+            Types::Combination(of_types) => write!(
+                f,
+                "({})",
+                of_types
+                    .iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Types::Fn { args, expect } => write!(
+                f,
+                "fn({}) -> {}",
+                args.iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                expect
+            ),
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Boolean(value) => write!(f, "{}", value),
+            Value::Integer(value) => write!(f, "{}", value),
+            Value::Float(value) => write!(f, "{}", value),
+            Value::String(value) => write!(f, "{}", value),
+            Value::Vector(value) => write!(f, "{}", {
+                format!(
+                    "[{}]",
+                    value
+                        .iter()
+                        .map(|x| format!("{}", x))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }),
+            Value::Combination(value) => write!(f, "{}", {
+                format!(
+                    "({})",
+                    value
+                        .iter()
+                        .map(|x| format!("{}", x))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }),
+            Value::Fn(value) => write!(
+                f,
+                "fn({}) {{\n\t{}\n}}",
+                value
+                    .args
+                    .iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                value.container
+            ),
+        }
     }
 }

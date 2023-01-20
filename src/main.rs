@@ -16,7 +16,7 @@
 
 #![allow(non_snake_case)]
 
-use language::intermediate::{Check, Identifier, Module};
+use language::intermediate::{lexis::Identifier, Module};
 
 use core::str;
 use std::{ffi::OsString, fs};
@@ -182,14 +182,51 @@ fn start_interaction(
         .get_one::<bool>("disableCheck")
         .unwrap_or_else(|| &false)
     {
-        if let Err(error) = parsed.check() {
-            println!("{}", error);
+        let errors = parsed.check();
+        if !errors.is_empty() {
+            println!(
+                "{}",
+                DisplayList::from(Snippet {
+                    title: Some(Annotation {
+                        label: Some("error encountered"),
+                        id: None,
+                        annotation_type: AnnotationType::Error,
+                    }),
+                    footer: vec![],
+                    slices: errors
+                        .iter()
+                        .map(|x| Slice {
+                            source: x.where_is.as_str(),
+                            line_start: 0,
+                            origin: None,
+                            fold: true,
+                            annotations: vec![SourceAnnotation {
+                                label: x.explanation.as_str(),
+                                annotation_type: AnnotationType::Error,
+                                range: (0, x.where_is.len()),
+                            }],
+                        })
+                        .collect::<Vec<Slice>>(),
+                    opt: FormatOptions {
+                        color: true,
+                        ..Default::default()
+                    },
+                })
+            );
+            return Err(format!(
+                "Encountered error while checking! {}",
+                errors
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ));
         }
     }
 
     match command.subcommand() {
         Some(("representation", _)) => {
-            println!("{:#?}", parsed);
+            parsed.content.iter().for_each(|x| println!("{}", x));
             Ok(None)
         }
         _ => Ok(Some(command)),

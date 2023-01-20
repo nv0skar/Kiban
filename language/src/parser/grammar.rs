@@ -17,12 +17,11 @@
 use crate::intermediate::{
     container::{Callable, Container, Scope},
     expression::{Expression, Operator},
-    primitives::{Blend, Types, Value},
+    lexis::{Blend, Constant, Defined, Identified, Identifier, Import, Lexis},
+    primitives::{Types, Value},
     statement::Statement,
-    Defined, Identifier, Lexis, Module,
+    Module,
 };
-
-use std::collections::HashMap;
 
 use peg;
 
@@ -148,12 +147,12 @@ peg::parser! {
             --
             value:value() { Expression::Unary(value) }
             --
-            function:(@) "(" _ args:(expression() ** __ ) _ ")" {
-                Expression::CallFn { function: Box::new(function), args }
+            target:(@) "(" _ args:(expression() ** __ ) _ ")" {
+                Expression::CallFn { target: Box::new(target), args }
             }
             --
-            function:(@) "." target:identifier() "(" _ args:(expression() ** __ ) _ ")" {
-                Expression::TypeFn { function: Box::new(function), target, args }
+            target:(@) "." function:identifier() "(" _ args:(expression() ** __ ) _ ")" {
+                Expression::TypeFn { target: Box::new(target), function, args }
             }
             --
             vector:(@) "[" _ to:expression() _ "]" {
@@ -202,24 +201,20 @@ peg::parser! {
 
         rule statement() -> Statement = statement:(statement_typed_declaration() / statement_inferred_declaration() / statement_assign() / statement_continue_loop() / statement_break_loop() / statement_return()) ___ { statement } / statement:(statement_condition() / statement_loop_while() / statement_loop_element() / statement_expression()) ___? { statement }
 
-        rule imports() -> (Identifier, Lexis)  = _ "import" _ id:identifier() _ ___ _ { (id, Lexis::Import) }
-        rule constants() -> (Identifier, Lexis) = _ "const" _ id:identifier() _ "=" _ value:value() _ ___ _ { (id, Lexis::Constant(value)) }
-        rule blend_types() -> (Identifier, Lexis) = _ "type" _ id:identifier() _ "=" _ blend:types() _ ___ _ { (id, Lexis::Blend(Blend(blend))) }
-        rule functions() -> (Identifier, Lexis) = _ is_entry:"entry"? _ "fn" _ id:identifier() "(" _ args:(defined() ** ___ ) _ ")" _ return_type:("->" _ return_type:types() { return_type })? _ container:container() _ {
-            (id, Lexis::Function((is_entry.is_some(), Callable {
+        rule imports() -> Lexis = _ "import" _ id:identifier() _ ___ _ { Lexis::Import(Import(id)) }
+        rule constants() -> Lexis = _ "const" _ id:identifier() _ "=" _ value:value() _ ___ _ { Lexis::Constant(Identified { id, content: Constant(value) }) }
+        rule blend_types() -> Lexis = _ "type" _ id:identifier() _ "=" _ types:types() _ ___ _ { Lexis::Blend(Identified { id, content: Blend(types) }) }
+        rule functions() -> Lexis = _ is_entry:"entry"? _ "fn" _ id:identifier() "(" _ args:(defined() ** ___ ) _ ")" _ return_type:("->" _ return_type:types() { return_type })? _ container:container() _ {
+            Lexis::Function((is_entry.is_some(), Identified {id, content: Callable {
                 args: args,
                 container: Container {
                     statements: container.statements, expect: return_type.unwrap_or(Types::Unknown)
                 }
-            })))
+            } }))
         }
 
         pub rule module() -> Module = global_scope:(lexis:(imports() / constants() / blend_types() / functions()) ** _ { lexis }) {
-            let mut module = Module { id: None, content: HashMap::new() };
-            for lexis in global_scope {
-                module.content.insert(lexis.0, lexis.1);
-            }
-            module
+            Module { id: None, content: global_scope }
         }
     }
 }

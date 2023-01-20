@@ -14,16 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod grammar;
+use std::fmt::Display;
 
-use grammar::parse;
+#[derive(Clone, Debug)]
+pub struct Error {
+    pub explanation: String,
+    pub where_is: String,
+}
 
-use crate::intermediate::{lexis::Identifier, Module};
+pub trait Check {
+    fn check(&self, error_track: &mut Vec<Error>);
+}
 
-use peg::{error::ParseError, str::LineCol};
-
-impl Module {
-    pub fn parse(_id: Option<Identifier>, input: &String) -> Result<Self, ParseError<LineCol>> {
-        parse::module(input)
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} @ ({}))", self.explanation, self.where_is)
     }
 }

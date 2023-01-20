@@ -14,56 +14,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use self::check::Check;
+
+pub mod check;
 pub mod container;
 pub mod expression;
+pub mod lexis;
 pub mod primitives;
 pub mod statement;
 
-use std::{collections::HashMap, hash::Hash};
-
 use {
-    container::Callable,
-    primitives::{Blend, Types, Value},
+    check::Error,
+    lexis::{Identifier, Lexis},
 };
-
-pub trait Check {
-    fn check(&self) -> Result<(), String>;
-}
-
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
-pub struct Identifier(pub Vec<u8>);
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct Defined {
-    pub id: Identifier,
-    pub kind: Types,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-
-pub enum Lexis {
-    Import,
-    Constant(Value),
-    Blend(Blend),
-    Function((bool, Callable)),
-}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Module {
     pub id: Option<Identifier>,
-    pub content: HashMap<Identifier, Lexis>,
+    pub content: Vec<Lexis>,
 }
 
 impl Module {
     pub fn find_entry(&self) -> Result<Identifier, String> {
         let mut entry_id: Option<Identifier> = None;
-        for (id, lexis) in &self.content {
-            if let Lexis::Function((is_entry, _)) = lexis {
+        for lexis in &self.content {
+            if let Lexis::Function((is_entry, callable)) = lexis {
                 if *is_entry {
                     if entry_id.is_some() {
                         return Err("Cannot exist multiple entry functions!".to_string());
                     }
-                    entry_id = Some(id.clone());
+                    entry_id = Some(callable.id.clone());
                 }
             }
         }
@@ -75,27 +55,28 @@ impl Module {
     }
 }
 
-impl Check for Module {
-    fn check(&self) -> Result<(), String> {
-        for (id, lexis) in &self.content {
+impl Module {
+    pub fn check(&self) -> Vec<Error> {
+        let mut error_track: Vec<Error> = vec![];
+        for lexis in &self.content {
             match lexis {
-                Lexis::Import => {
+                Lexis::Import(import) => {
                     if let Some(module_id) = &self.id {
-                        if id == module_id {
-                            return Err(format!("Module {:?} cannot import to itself!", id));
+                        if &import.0 == module_id {
+                            error_track.push(Error {
+                                explanation: format!(
+                                    "Module {} cannot import to itself!",
+                                    module_id
+                                ),
+                                where_is: import.to_string(),
+                            });
                         }
                     }
                 }
-                Lexis::Function((_, callable)) => callable.check()?,
+                Lexis::Function((_, callable)) => callable.content.check(error_track.as_mut()),
                 _ => (),
             }
         }
-        Ok(())
-    }
-}
-
-impl From<String> for Identifier {
-    fn from(value: String) -> Self {
-        Self(value.as_bytes().to_vec())
+        error_track
     }
 }

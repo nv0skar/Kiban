@@ -14,7 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use super::{primitives::Types, statement::Statement, Check, Defined, Identifier};
+use super::{
+    check::{Check, Error},
+    lexis::{Defined, Identifier},
+    primitives::Types,
+    statement::Statement,
+};
+
+use std::fmt::Display;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Container {
@@ -41,8 +48,8 @@ impl Container {
                     if last_unwrapped != Types::Unknown && expression_type != Types::Unknown {
                         if last_unwrapped != expression_type {
                             return Err(format!(
-                                "Multiple return types ({:?} & {:?}) in the same scope!",
-                                last_type,
+                                "Multiple return types ({} & {}) in the same scope!",
+                                last_type.unwrap(),
                                 expression.infer_type()
                             ));
                         } else if last_unwrapped != Types::Unknown
@@ -73,35 +80,71 @@ impl TryFrom<Vec<Statement>> for Container {
 }
 
 impl Check for Container {
-    fn check(&self) -> Result<(), String> {
+    fn check(&self, error_track: &mut Vec<Error>) {
         for statement in &self.statements {
-            statement.check()?;
+            statement.check(error_track);
         }
-        let inferred_type = Self::infer_type_by_context(self.statements.clone())?;
+        let inferred_type = Self::infer_type_by_context(self.statements.clone()).unwrap();
         if self.expect != inferred_type
             && inferred_type != Types::Unknown
             && self.expect != Types::Unknown
             && std::mem::discriminant(&self.expect)
                 != std::mem::discriminant(&Types::Reference(Identifier(vec![])))
         {
-            return Err(format!(
-                "Container returns {:?} but must return {:?}!",
-                inferred_type, self.expect
-            ));
-        } else {
-            Ok(())
+            error_track.push(Error {
+                explanation: format!(
+                    "Container returns {} but must return {}!",
+                    inferred_type, self.expect
+                ),
+                where_is: self.to_string(),
+            });
         }
     }
 }
 
 impl Check for Scope {
-    fn check(&self) -> Result<(), String> {
-        self.0.check()
+    fn check(&self, error_track: &mut Vec<Error>) {
+        self.0.check(error_track);
     }
 }
 
 impl Check for Callable {
-    fn check(&self) -> Result<(), String> {
-        self.container.check()
+    fn check(&self, error_track: &mut Vec<Error>) {
+        self.container.check(error_track);
+    }
+}
+
+impl Display for Container {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.statements
+                .iter()
+                .map(|x| format!("{}", x))
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
+    }
+}
+
+impl Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{\n{}\n}}", self.0)
+    }
+}
+
+impl Display for Callable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "({}) {{\n{}\n}}",
+            self.args
+                .iter()
+                .map(|x| format!("{}", x))
+                .collect::<Vec<String>>()
+                .join(", "),
+            self.container
+        )
     }
 }
