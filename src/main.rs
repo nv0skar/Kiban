@@ -16,22 +16,24 @@
 
 #![allow(non_snake_case)]
 
-use language::intermediate::{lexis::Identifier, Module};
+use kiban_ast::expression::Expression;
+use kiban_commons::parser::Parsable;
+use kiban_lexer::TokenStream;
 
-use core::str;
 use std::{ffi::OsString, fs};
 
-use annotate_snippets::{
-    display_list::{DisplayList, FormatOptions},
-    snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation},
-};
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use miette::Result;
 
-fn main() {
-    let _ = start_interaction((None, None), None);
+fn main() -> Result<()> {
+    let lexed = TokenStream::parse("some_array = [apple, banana]", None)?;
+    println!("{}", lexed);
+    let parsed = Expression::parse(lexed.clone());
+    println!("{:#?}", parsed);
+    Ok(())
 }
 
-fn start_interaction(
+fn _run(
     implementation: (Option<String>, Option<String>),
     subcommands: Option<Vec<Command>>,
 ) -> Result<Option<ArgMatches>, String> {
@@ -89,18 +91,10 @@ fn start_interaction(
             .unwrap_or_else(|| &false),
     );
 
-    let (id, source, origin) = (
+    let (_id, _source, _origin) = (
         {
             if !read_as_source {
-                Some(Identifier(
-                    input
-                        .clone()
-                        .rsplit('.')
-                        .next()
-                        .unwrap()
-                        .as_bytes()
-                        .to_vec(),
-                ))
+                Some(input.clone().rsplit('.').next().unwrap().to_string())
             } else {
                 None
             }
@@ -126,18 +120,13 @@ fn start_interaction(
         },
     );
 
-    let parsed = {
-        match Module::parse(id.clone(), &source) {
+    todo!()
+
+    /* let parsed = {
+        match parse(id.clone(), source) {
             Ok(module) => module,
             Err(error) => {
-                let reasoning = format!(
-                    "Expected one of the following set {:#?}",
-                    error
-                        .expected
-                        .tokens()
-                        .collect::<Vec<&'static str>>()
-                        .join(" ")
-                );
+                let reasoning = format!("Expected one of the following set {:#?}", "");
                 println!(
                     "{}",
                     DisplayList::from(Snippet {
@@ -161,10 +150,7 @@ fn start_interaction(
                             annotations: vec![SourceAnnotation {
                                 label: reasoning.as_str(),
                                 annotation_type: AnnotationType::Error,
-                                range: (
-                                    error.location.line,
-                                    (error.location.line + error.location.offset),
-                                ),
+                                range: (0, 0),
                             }],
                         }],
                         opt: FormatOptions {
@@ -226,9 +212,9 @@ fn start_interaction(
 
     match command.subcommand() {
         Some(("representation", _)) => {
-            parsed.content.iter().for_each(|x| println!("{}", x));
+            parsed.content.0.iter().for_each(|x| println!("{}", x));
             Ok(None)
         }
         _ => Ok(Some(command)),
-    }
+    } */
 }

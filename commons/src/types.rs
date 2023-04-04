@@ -14,16 +14,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod grammar;
+use derive_more::{Constructor, Display};
 
-use grammar::parse;
+#[derive(Clone, PartialEq, Display, Constructor, Debug)]
+#[display(fmt = "signed: {} & size: {}", signed, size)]
+pub struct NumberDef {
+    signed: bool,
+    size: Size,
+}
 
-use crate::intermediate::{lexis::Identifier, Module};
+#[derive(Clone, PartialEq, Display, Debug)]
+pub enum Size {
+    _8,
+    _16,
+    _32,
+    _64,
+}
 
-use peg::{error::ParseError, str::LineCol};
-
-impl Module {
-    pub fn parse(_id: Option<Identifier>, input: &String) -> Result<Self, ParseError<LineCol>> {
-        parse::module(input)
+impl Default for NumberDef {
+    fn default() -> Self {
+        Self::new(false, Size::_8)
     }
 }

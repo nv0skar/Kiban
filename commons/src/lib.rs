@@ -14,20 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::Display;
+pub mod parser;
+pub mod span;
+pub mod types;
 
-#[derive(Clone, Debug)]
-pub struct Error {
-    pub explanation: String,
-    pub where_is: String,
-}
+pub use parser::*;
+pub use span::*;
+pub use types::*;
 
-pub trait Check {
-    fn check(&self, error_track: &mut Vec<Error>);
-}
+use smallbox::{space::S16, SmallBox};
+use smallvec::SmallVec;
 
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} @ ({}))", self.explanation, self.where_is)
-    }
-}
+pub type SBox<T> = SmallBox<T, S16>;
+pub type SVec<T> = SmallVec<[T; 16]>;

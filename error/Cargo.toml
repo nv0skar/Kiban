@@ -1,0 +1,9 @@
+[package]
+name = "kiban_error"
+description = "Kiban's errors ⚠️"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+miette = "5.5"
+thiserror = "1.0"

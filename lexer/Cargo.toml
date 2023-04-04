@@ -1,0 +1,19 @@
+[package]
+name = "kiban_lexer"
+description = "Kiban's lexer 🪨"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+kiban_commons = { path = "../commons" }
+kiban_error = { path = "../error" }
+kiban_lexer_derive = { path = "./lexer_derive" }
+smallvec = "1.10"
+smol_str = "0.1"
+derive_more = "0.99"
+getset = "0.1"
+paste = "1.0"
+nom = "7.1"
+nom_locate = "4.1"
+nom-recursive = { git = "https://github.com/nv0skar/nom_recursive_without_pointers" }
+miette = "5.5"

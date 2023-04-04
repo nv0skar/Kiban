@@ -14,5 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod intermediate;
-pub mod parser;
+use crate::generic::Identifier;
+
+node_variant! { Import {
+    Name(Identifier),
+    As {
+        origin: Identifier,
+        name: Identifier,
+    },
+}}

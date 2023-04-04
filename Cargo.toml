@@ -5,9 +5,17 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-language = { version = "0.0.1", path = "./language" }
-clap = { version = "4.1.1", features = ["string"]}
-annotate-snippets = { version = "0.9.1", features = ["color"]}
+kiban_commons = { path = "./commons" }
+kiban_ast = { path = "./ast" }
+kiban_lexer = { path = "./lexer" }
+kiban_error = { path = "./error" }
+nom = "7"
+nom_locate = "4.1"
+nom-recursive = "0.5"
+derive_more = "0.99"
+getset = "0.1.2"
+clap = { version = "4.1", features = ["string"]}
+miette = { version = "5.5", features = ["fancy"] }
 
 [workspace]
-members = ["language"]
+members = ["commons", "ast", "lexer", "error"]
