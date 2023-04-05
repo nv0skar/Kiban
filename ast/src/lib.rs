@@ -36,8 +36,8 @@ macro_rules! separator {
     () => {
         nom::combinator::map(
             nom::multi::many0(nom::branch::alt((
-                tag(Token::Punctuation(Punctuation::Space)),
-                tag(Token::Punctuation(Punctuation::Newline)),
+                nom::bytes::complete::tag(SPACE),
+                nom::bytes::complete::tag(NEWLINE),
             ))),
             |_| (),
         )

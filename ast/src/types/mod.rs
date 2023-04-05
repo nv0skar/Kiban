@@ -88,7 +88,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
             ),
             map(
                 tuple((
-                    tag(Token::Keyword(Keyword::Fn)),
+                    tag(Token::Type(Type::Fn)),
                     preceded(
                         separated!(both tag(OP_PAREN)),
                         pair(

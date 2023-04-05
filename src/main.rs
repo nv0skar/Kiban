@@ -16,7 +16,7 @@
 
 #![allow(non_snake_case)]
 
-use kiban_ast::{closure::Closure, expression::Expression, statement::Statement};
+use kiban_ast::expression::Expression;
 use kiban_commons::parser::Parsable;
 use kiban_lexer::TokenStream;
 
@@ -29,22 +29,15 @@ fn main() -> Result<()> {
     // let lexed = TokenStream::parse("some_value = [banana.juice, potato.slice]", None)?;
     // let lexed = TokenStream::parse("for item in hello::meaning return hello.0", None)?;
     // let lexed = TokenStream::parse("for item in hello::meaning return hello.0", None)?;
-    // let lexed = TokenStream::parse("while cow::speaks return madness", None)?;
+    // let lexed = TokenStream::parse("while cow::speaks return", None)?;
     // let lexed = TokenStream::parse("if tomorrow_rains return error else return good", None)?;
     // let lexed = TokenStream::parse("some_value.0 as bool", None)?;
     // let lexed = TokenStream::parse("some_array[some_value]", None)?;
-    // let lexed = TokenStream::parse("some_func(hello, bye)", None)?;
+    let lexed = TokenStream::parse("some_func(hello, bye).0", None)?;
     // let lexed = TokenStream::parse("let hello: UInt32 = pot;", None)?;
     // let lexed = TokenStream::parse("hello;", None)?;
-    let lexed = TokenStream::parse(
-        "{
-        let hello: Bool = some_constant;
-        hello
-    }",
-        None,
-    )?;
     println!("{}\n", lexed);
-    let parsed = Closure::parse(lexed.clone());
+    let parsed = Expression::parse(lexed.clone());
     println!("{:#?}", parsed);
     Ok(())
 }

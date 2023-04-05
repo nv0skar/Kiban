@@ -44,14 +44,14 @@ impl Parsable<Input, (Self, Span)> for _Statement {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
             map(
-                pair(_declaration, separated!(left tag(SEMICOLON))),
+                pair(_declaration, separated!(both tag(SEMICOLON))),
                 |((declaration, dec_span), last)| {
                     (declaration, Span::from_combination(dec_span, last.span()))
                 },
             ),
             alt((
                 map(
-                    pair(_expression, separated!(left tag(SEMICOLON))),
+                    pair(_expression, separated!(both tag(SEMICOLON))),
                     |((expression, exp_span), last)| {
                         (expression, Span::from_combination(exp_span, last.span()))
                     },

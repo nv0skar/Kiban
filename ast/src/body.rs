@@ -14,12 +14,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{generic::Definition, statement::Statement, types::Types};
+use crate::{expression::Expression, generic::Definition, separated, types::Types, Input};
 
-use kiban_commons::SVec;
+use kiban_commons::*;
+use kiban_lexer::*;
+
+use nom::{combinator::map, multi::fold_many1, IResult};
 
 node_def! { Body {
-    pub params: SVec<Definition>,
-    pub statements: Vec<Statement>,
-    pub expect: Types,
+    pub params: Option<Parameters>,
+    pub closure: SBox<Expression>,
+    pub expect: Option<Types>,
 }}
+
+node_def!(Parameters(SVec<Definition>));
+
+impl Parsable<Input, (Self, Span)> for _Parameters {
+    fn parse(s: Input) -> IResult<Input, (Self, Span)> {
+        map(
+            fold_many1(
+                separated!(both Definition::parse),
+                SVec::new,
+                |mut buff, s| {
+                    buff.push(s);
+                    buff
+                },
+            ),
+            |s| {
+                (
+                    Self(s.clone()),
+                    Span::from_combination(
+                        s.first().unwrap().clone().location,
+                        s.last().unwrap().clone().location,
+                    ),
+                )
+            },
+        )(s)
+    }
+}

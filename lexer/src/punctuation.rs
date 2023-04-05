@@ -41,6 +41,8 @@ pub enum Punctuation {
     ClsChevron,
     #[token = "|"]
     VertBar,
+    #[token = "_"]
+    UnderScore,
     #[token = ","]
     Comma,
     #[token = "."]
