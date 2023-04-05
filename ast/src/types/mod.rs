@@ -17,7 +17,7 @@
 use crate::{
     generic::{Definition, Namespace},
     literal::Int,
-    map_token_with_field, separated, separator, Input,
+    map_token_with_field, separated, Input,
 };
 
 use kiban_commons::*;
@@ -27,8 +27,8 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     combinator::{map, opt},
-    multi::{many0, separated_list0, separated_list1},
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    multi::{separated_list0, separated_list1},
+    sequence::{pair, preceded, terminated, tuple},
     IResult,
 };
 
@@ -69,7 +69,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
                 |(first, (types, size), last): (Input, (_, _), Input)| {
                     (
                         Self::Array(SBox::new(types), size),
-                        Span::from_spans(first.span(), last.span()),
+                        Span::from_combination(first.span(), last.span()),
                     )
                 },
             ),
@@ -82,7 +82,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
                 |(first, types, last): (Input, _, Input)| {
                     (
                         Self::Tuple(types),
-                        Span::from_spans(first.span(), last.span()),
+                        Span::from_combination(first.span(), last.span()),
                     )
                 },
             ),
@@ -104,7 +104,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
                             params,
                             expect: expect.clone().map(|s| SBox::new(s)),
                         },
-                        Span::from_spans(first.span(), {
+                        Span::from_combination(first.span(), {
                             if let Some(expect) = expect {
                                 expect.location
                             } else {

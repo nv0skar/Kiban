@@ -20,7 +20,7 @@ pub mod range;
 use crate::{
     body::Body,
     generic::{Identifier, Namespace},
-    separated, separator,
+    separated,
     statement::Statement,
     types::Types,
     Input,
@@ -35,9 +35,9 @@ use kiban_lexer::*;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    combinator::map,
-    multi::{many0, separated_list1},
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    combinator::{map, opt},
+    multi::{separated_list0, separated_list1},
+    sequence::{pair, preceded, terminated, tuple},
     IResult,
 };
 use nom_recursive::recursive_parser;
@@ -95,7 +95,6 @@ node_variant! { Expression {
 }}
 
 impl Parsable<Input, (Self, Span)> for _Expression {
-    #[recursive_parser]
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
             map(
@@ -103,7 +102,7 @@ impl Parsable<Input, (Self, Span)> for _Expression {
                 |(ref_token, s)| {
                     (
                         Self::Refer(SBox::new(s.clone())),
-                        Span::from_spans(ref_token.span(), s.location),
+                        Span::from_combination(ref_token.span(), s.location),
                     )
                 },
             ),
@@ -112,17 +111,26 @@ impl Parsable<Input, (Self, Span)> for _Expression {
                 |(deref_token, s)| {
                     (
                         Self::Derefer(SBox::new(s.clone())),
-                        Span::from_spans(deref_token.span(), s.location),
+                        Span::from_combination(deref_token.span(), s.location),
                     )
                 },
             ),
+            _call,
+            _cast,
+            _index,
+            _field,
             map(
                 tuple((
                     separated!(right tag(OP_SQ_BRACKET)),
                     separated_list1(separated!(both tag(COMMA)), Expression::parse),
                     separated!(left tag(CLS_SQ_BRACKET)),
                 )),
-                |(start, s, last)| (Self::Array(s), Span::from_spans(start.span(), last.span())),
+                |(start, s, last)| {
+                    (
+                        Self::Array(s),
+                        Span::from_combination(start.span(), last.span()),
+                    )
+                },
             ),
             map(
                 tuple((
@@ -130,7 +138,12 @@ impl Parsable<Input, (Self, Span)> for _Expression {
                     separated_list1(separated!(both tag(COMMA)), Expression::parse),
                     separated!(left tag(CLS_PAREN)),
                 )),
-                |(start, s, last)| (Self::Tuple(s), Span::from_spans(start.span(), last.span())),
+                |(start, s, last)| {
+                    (
+                        Self::Tuple(s),
+                        Span::from_combination(start.span(), last.span()),
+                    )
+                },
             ),
             map(
                 tuple((
@@ -143,23 +156,177 @@ impl Parsable<Input, (Self, Span)> for _Expression {
                             name: name.clone(),
                             value: SBox::new(value.clone()),
                         },
-                        Span::from_spans(name.location, value.location),
+                        Span::from_combination(name.location, value.location),
                     )
                 },
             ),
             map(
-                tuple((terminated(Expression::parse, tag(DOT)), Identifier::parse)),
-                |(from, to)| {
+                tuple((
+                    tag(IF),
+                    separated!(both Expression::parse),
+                    Expression::parse,
+                    opt(preceded(separated!(both tag(ELSE)), Expression::parse)),
+                )),
+                |(first, check, then, if_not)| {
                     (
-                        Self::Field {
-                            from: SBox::new(from.clone()),
-                            to: to.clone(),
+                        Self::Cond {
+                            check: SBox::new(check),
+                            then: SBox::new(then.clone()),
+                            if_not: if_not.clone().map(|s| SBox::new(s)),
                         },
-                        Span::from_spans(from.location, to.location),
+                        Span::from_combination(first.span(), {
+                            match if_not {
+                                Some(value) => value.location,
+                                None => then.location,
+                            }
+                        }),
+                    )
+                },
+            ),
+            map(
+                tuple((tag(LOOP), separated!(left Expression::parse))),
+                |(first, repeat)| {
+                    (
+                        Self::Loop {
+                            repeat: SBox::new(repeat.clone()),
+                        },
+                        Span::from_combination(first.span(), repeat.location),
+                    )
+                },
+            ),
+            map(
+                tuple((
+                    tag(FOR),
+                    separated!(both Identifier::parse),
+                    tag(IN),
+                    separated!(both Expression::parse),
+                    Expression::parse,
+                )),
+                |(first, item, _, iterable, then)| {
+                    (
+                        Self::For {
+                            item,
+                            iterable: SBox::new(iterable),
+                            then: SBox::new(then.clone()),
+                        },
+                        Span::from_combination(first.span(), then.location),
+                    )
+                },
+            ),
+            map(
+                tuple((
+                    tag(WHILE),
+                    separated!(both Expression::parse),
+                    Expression::parse,
+                )),
+                |(first, check, repeat)| {
+                    (
+                        Self::While {
+                            check: SBox::new(check),
+                            repeat: SBox::new(repeat.clone()),
+                        },
+                        Span::from_combination(first.span(), repeat.location),
+                    )
+                },
+            ),
+            map(tag(CONTINUE), |s: Input| (Self::Continue, s.span())),
+            map(tag(BREAK), |s: Input| (Self::Continue, s.span())),
+            map(
+                pair(tag(RETURN), separated!(left opt(Expression::parse))),
+                |(first, rtrn_value)| {
+                    (
+                        Self::Return(rtrn_value.clone().map(|s| SBox::new(s))),
+                        Span::from_combination(first.span(), {
+                            match rtrn_value {
+                                Some(value) => value.location,
+                                None => first.span(),
+                            }
+                        }),
                     )
                 },
             ),
             map(Namespace::parse, |s| (Self::Name(s.clone()), s.location)),
         ))(s)
     }
+}
+
+#[recursive_parser]
+fn _cast(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        pair(
+            terminated(Expression::parse, separated!(both tag(AS))),
+            Types::parse,
+        ),
+        |(from, to)| {
+            (
+                _Expression::Cast {
+                    target: SBox::new(from.clone()),
+                    to: to.clone(),
+                },
+                Span::from_combination(from.location, to.location),
+            )
+        },
+    )(s)
+}
+
+#[recursive_parser]
+fn _index(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        tuple((
+            terminated(Expression::parse, separated!(both tag(OP_SQ_BRACKET))),
+            Expression::parse,
+            separated!(left tag(CLS_SQ_BRACKET)),
+        )),
+        |(from, to, last)| {
+            (
+                _Expression::Index {
+                    from: SBox::new(from.clone()),
+                    to: SBox::new(to.clone()),
+                },
+                Span::from_combination(from.location, last.span()),
+            )
+        },
+    )(s)
+}
+
+#[recursive_parser]
+fn _field(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        pair(
+            terminated(Expression::parse, separated!(both tag(DOT))),
+            Identifier::parse,
+        ),
+        |(from, to)| {
+            (
+                _Expression::Field {
+                    from: SBox::new(from.clone()),
+                    to: to.clone(),
+                },
+                Span::from_combination(from.location, to.location),
+            )
+        },
+    )(s)
+}
+
+#[recursive_parser]
+fn _call(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        pair(
+            Expression::parse,
+            tuple((
+                separated!(both tag(OP_PAREN)),
+                separated_list0(separated!(both tag(COMMA)), Expression::parse),
+                separated!(left tag(CLS_PAREN)),
+            )),
+        ),
+        |(from, (_, to, last))| {
+            (
+                _Expression::Call {
+                    to: SBox::new(from.clone()),
+                    args: to.clone(),
+                },
+                Span::from_combination(from.location, last.span()),
+            )
+        },
+    )(s)
 }

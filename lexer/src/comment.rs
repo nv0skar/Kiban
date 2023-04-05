@@ -46,11 +46,11 @@ pub enum CommentType {
 
 impl<'a> Parsable<Input<'a>, Self> for Comment {
     fn parse(s: Input) -> IResult<Input, Self> {
-        alt((single_lined, multi_lined))(s)
+        alt((_single, _multi))(s)
     }
 }
 
-fn single_lined(s: Input) -> IResult<Input, Comment> {
+fn _single(s: Input) -> IResult<Input, Comment> {
     map(
         preceded(tag("//"), take_till(|c| is_newline(c as u8))),
         |s: Input| Comment {
@@ -60,7 +60,7 @@ fn single_lined(s: Input) -> IResult<Input, Comment> {
     )(s)
 }
 
-fn multi_lined(s: Input) -> IResult<Input, Comment> {
+fn _multi(s: Input) -> IResult<Input, Comment> {
     map(
         delimited(tag("/*"), take_until("*/"), tag("*/")),
         |s: Input| Comment {

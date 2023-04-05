@@ -38,7 +38,7 @@ impl Span {
         }
     }
 
-    pub fn from_spans(start: Span, end: Span) -> Span {
+    pub fn from_combination(start: Span, end: Span) -> Span {
         Span::new(*start.start(), *end.end())
     }
 }

@@ -47,17 +47,17 @@ pub enum Literal {
 
 impl<'a> Parsable<Input<'a>, Self> for Literal {
     fn parse(s: Input) -> IResult<Input, Self> {
-        alt((boolean, integer, float, character, string))(s)
+        alt((_boolean, _integer, _float, _character, _string))(s)
     }
 }
 
-fn boolean(s: Input) -> IResult<Input, Literal> {
+fn _boolean(s: Input) -> IResult<Input, Literal> {
     map(alt((mapped!("true", true), mapped!("false", false))), |s| {
         Literal::Bool(s)
     })(s)
 }
 
-fn integer(s: Input) -> IResult<Input, Literal> {
+fn _integer(s: Input) -> IResult<Input, Literal> {
     map_res(float_parse, |s| {
         if s.round() != s {
             Err(())
@@ -67,18 +67,18 @@ fn integer(s: Input) -> IResult<Input, Literal> {
     })(s)
 }
 
-fn float(s: Input) -> IResult<Input, Literal> {
+fn _float(s: Input) -> IResult<Input, Literal> {
     map(float_parse, |s| Literal::Float(s))(s)
 }
 
-fn character(s: Input) -> IResult<Input, Literal> {
+fn _character(s: Input) -> IResult<Input, Literal> {
     map(
         delimited(char('\''), take(1_usize), char('\'')),
         |s: Input| Literal::Char(s.chars().next().unwrap()),
     )(s)
 }
 
-fn string(s: Input) -> IResult<Input, Literal> {
+fn _string(s: Input) -> IResult<Input, Literal> {
     map(
         delimited(
             char('"'),

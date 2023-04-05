@@ -18,6 +18,7 @@
 pub mod node;
 
 pub mod body;
+pub mod closure;
 pub mod expression;
 pub mod generic;
 pub mod item;
@@ -33,8 +34,8 @@ use kiban_lexer::TokenStream;
 #[macro_export]
 macro_rules! separator {
     () => {
-        map(
-            many0(alt((
+        nom::combinator::map(
+            nom::multi::many0(nom::branch::alt((
                 tag(Token::Punctuation(Punctuation::Space)),
                 tag(Token::Punctuation(Punctuation::Newline)),
             ))),
@@ -46,13 +47,13 @@ macro_rules! separator {
 #[macro_export]
 macro_rules! separated {
     (left $parser:expr) => {
-        preceded(separator!(), $parser)
+        nom::sequence::preceded(crate::separator!(), $parser)
     };
     (right $parser:expr) => {
-        terminated($parser, separator!())
+        nom::sequence::terminated($parser, crate::separator!())
     };
     (both $parser:expr) => {
-        delimited(separator!(), $parser, separator!())
+        nom::sequence::delimited(crate::separator!(), $parser, crate::separator!())
     };
 }
 

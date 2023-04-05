@@ -14,5 +14,5 @@ derive_more = "0.99"
 getset = "0.1"
 nom = "7.1"
 nom_locate = "4.1"
-nom-recursive = { git = "https://github.com/nv0skar/nom_recursive_without_pointers" }
+nom-recursive = { git = "https://github.com/nv0skar/nom_recursive_without_pointers", features = ["tracer256"] }
 miette = "5.5"

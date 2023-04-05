@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{separated, separator, types::Types, Input};
+use crate::{separated, types::Types, Input};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -22,9 +22,9 @@ use kiban_lexer::*;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    combinator::map,
-    multi::{many0, separated_list1},
-    sequence::{delimited, pair, terminated},
+    combinator::{map, opt},
+    multi::separated_list1,
+    sequence::{pair, preceded},
     IResult,
 };
 use smol_str::SmolStr;
@@ -58,18 +58,18 @@ impl Parsable<Input, (Self, Span)> for _Identifier {
 
 node_def! { Definition {
     pub id: Identifier,
-    pub kind: Types,
+    pub kind: Option<Types>,
 }}
 
 impl Parsable<Input, (Self, Span)> for _Definition {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         map(
             pair(
-                terminated(
-                    Identifier::parse,
+                Identifier::parse,
+                opt(preceded(
                     separated!(both tag(Token::Punctuation(Punctuation::Colon))),
-                ),
-                Types::parse,
+                    Types::parse,
+                )),
             ),
             |(id, kind)| {
                 (
@@ -77,7 +77,12 @@ impl Parsable<Input, (Self, Span)> for _Definition {
                         id: id.clone(),
                         kind: kind.clone(),
                     },
-                    Span::from_spans(id.location, kind.location),
+                    Span::from_combination(id.location.clone(), {
+                        match kind {
+                            Some(ty) => ty.location,
+                            None => id.location,
+                        }
+                    }),
                 )
             },
         )(s)
@@ -99,7 +104,7 @@ impl Parsable<Input, (Self, Span)> for _Namespace {
             |s| {
                 (
                     Self(SVec::from(s.clone())),
-                    Span::from_spans(
+                    Span::from_combination(
                         s.first().unwrap().location.clone(),
                         s.last().unwrap().location.clone(),
                     ),

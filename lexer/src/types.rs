@@ -45,32 +45,32 @@ impl<'a> Parsable<Input<'a>, Self> for Type {
     fn parse(s: Input) -> IResult<Input, Self> {
         alt((
             mapped!("Bool", Self::Bool),
-            integer,
-            float,
+            _integer,
+            _float,
             map(tag("Fn"), |_| Type::Fn),
         ))(s)
     }
 }
 
-fn integer(s: Input) -> IResult<Input, Type> {
+fn _integer(s: Input) -> IResult<Input, Type> {
     map(
-        pair(signed, preceded(tag("Int"), size)),
+        pair(_signed, preceded(tag("Int"), _size)),
         |(signed, size)| Type::Int(NumberDef::new(signed, size)),
     )(s)
 }
 
-fn float(s: Input) -> IResult<Input, Type> {
+fn _float(s: Input) -> IResult<Input, Type> {
     map(
-        pair(signed, preceded(tag("Float"), size)),
+        pair(_signed, preceded(tag("Float"), _size)),
         |(signed, size)| Type::Float(NumberDef::new(signed, size)),
     )(s)
 }
 
-fn signed(s: Input) -> IResult<Input, bool> {
+fn _signed(s: Input) -> IResult<Input, bool> {
     map(opt(char('U')), |s| s.map_or(true, |_| false))(s)
 }
 
-fn size(s: Input) -> IResult<Input, Size> {
+fn _size(s: Input) -> IResult<Input, Size> {
     alt((
         mapped!("8", Size::_8),
         mapped!("16", Size::_16),
