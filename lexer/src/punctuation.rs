@@ -43,6 +43,10 @@ pub enum Punctuation {
     VertBar,
     #[token = "_"]
     UnderScore,
+    #[token = ".."]
+    Range,
+    #[token = ".="]
+    RangeInclusive,
     #[token = ","]
     Comma,
     #[token = "."]

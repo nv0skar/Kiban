@@ -21,7 +21,7 @@ use crate::{
 };
 
 use kiban_commons::*;
-use kiban_lexer::*;
+use kiban_lexer::{Types as TypesToken, *};
 
 use nom::{
     branch::alt,
@@ -49,11 +49,11 @@ impl Parsable<Input, (Self, Span)> for _Types {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
             map(Namespace::parse, |s| (Self::Name(s.clone()), s.location)),
-            map(tag(Token::Type(Type::Bool)), |s: Input| {
+            map(tag(Token::Types(TypesToken::Bool)), |s: Input| {
                 (Self::Boolean, s.span())
             }),
-            map_token_with_field!(Token::Type, Type::Int, Self::Integer),
-            map_token_with_field!(Token::Type, Type::Float, Self::Float),
+            map_token_with_field!(Token::Types, TypesToken::Int, Self::Integer),
+            map_token_with_field!(Token::Types, TypesToken::Float, Self::Float),
             map(
                 tuple((
                     separated!(right tag(OP_SQ_BRACKET)),
@@ -88,7 +88,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
             ),
             map(
                 tuple((
-                    tag(Token::Type(Type::Fn)),
+                    tag(Token::Types(TypesToken::Fn)),
                     preceded(
                         separated!(both tag(OP_PAREN)),
                         pair(

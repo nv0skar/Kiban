@@ -84,7 +84,7 @@ pub enum Token {
     #[display(fmt = "{} (punct)", _0)]
     Punctuation(Punctuation),
     #[display(fmt = "{} (type)", _0)]
-    Type(Type),
+    Types(Types),
     #[display(fmt = "{} (lit)", _0)]
     Literal(Literal),
     #[display(fmt = "{} (comment)", _0)]
@@ -184,10 +184,10 @@ impl<'a> Parsable<Input<'a>, (Token, Span)> for Token {
             consumed(alt((
                 map(Comment::parse, |s| Self::Comment(s)),
                 map(Keyword::parse, |s| Self::Keyword(s)),
-                map(Operator::parse, |s| Self::Operator(s)),
                 map(Punctuation::parse, |s| Self::Punctuation(s)),
-                map(Type::parse, |s| Self::Type(s)),
                 map(Literal::parse, |s| Self::Literal(s)),
+                map(Operator::parse, |s| Self::Operator(s)),
+                map(Types::parse, |s| Self::Types(s)),
                 map(
                     take_while1(|c: char| -> bool { is_alphanumeric(c as u8) || c == '_' }),
                     |s: Input| Token::Identifier(s.into()),

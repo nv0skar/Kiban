@@ -21,6 +21,7 @@ use crate::{
     body::{Body, Parameters, _Body},
     closure::Closure,
     generic::{Identifier, Namespace},
+    literal::Literal as LiteralTree,
     node::Node,
     separated,
     types::Types,
@@ -36,7 +37,7 @@ use kiban_lexer::*;
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    combinator::{map, map_parser, opt},
+    combinator::{map, opt},
     multi::{separated_list0, separated_list1},
     sequence::{pair, preceded, terminated, tuple},
     IResult,
@@ -48,6 +49,7 @@ node_variant! { Expression {
     Refer(SBox<Expression>),
     Derefer(SBox<Expression>),
     Closure(Closure),
+    Literal(LiteralTree),
     Op(Operator),
     Array(Vec<Expression>),
     Tuple(Vec<Expression>),
@@ -101,18 +103,23 @@ impl Parsable<Input, (Self, Span)> for _Expression {
             _closure,
             _ref,
             _deref,
-            // _func,
+            _func,
             _cond,
             _loop,
             _for,
             _while,
             map(tag(CONTINUE), |s: Input| (Self::Continue, s.span())),
             map(tag(BREAK), |s: Input| (Self::Continue, s.span())),
+            _range,
             _assign,
             _array,
             _tuple,
             _return,
-            _recursive,
+            _call,
+            _field,
+            _index,
+            _cast,
+            _literal,
             map(Namespace::parse, |s| (Self::Name(s.clone()), s.location)),
         ))(s)
     }
@@ -148,16 +155,30 @@ fn _deref(s: Input) -> IResult<Input, (_Expression, Span)> {
     )(s)
 }
 
-fn _call(s: Input, expr: Expression) -> IResult<Input, (_Expression, Span)> {
+fn _literal(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(LiteralTree::parse, |s| {
+        (_Expression::Literal(s.clone()), s.location)
+    })(s)
+}
+
+fn _range(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(Range::parse, |s| {
+        (_Expression::Range(s.clone()), s.location)
+    })(s)
+}
+
+#[recursive_parser]
+fn _call(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
-        pair(
+        tuple((
+            Expression::parse,
             preceded(
                 separated!(right tag(OP_PAREN)),
                 separated_list0(separated!(both tag(COMMA)), Expression::parse),
             ),
             separated!(left tag(CLS_PAREN)),
-        ),
-        |(to, last)| {
+        )),
+        |(expr, to, last)| {
             (
                 _Expression::Call {
                     to: SBox::new(expr.clone()),
@@ -169,25 +190,53 @@ fn _call(s: Input, expr: Expression) -> IResult<Input, (_Expression, Span)> {
     )(s)
 }
 
-fn _cast(s: Input, expr: Expression) -> IResult<Input, (_Expression, Span)> {
-    map(preceded(separated!(both tag(AS)), Types::parse), |to| {
-        (
-            _Expression::Cast {
-                target: SBox::new(expr.clone()),
-                to: to.clone(),
-            },
-            Span::from_combination(expr.location.clone(), to.location),
-        )
-    })(s)
-}
-
-fn _index(s: Input, expr: Expression) -> IResult<Input, (_Expression, Span)> {
+#[recursive_parser]
+fn _field(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         pair(
+            Expression::parse,
+            preceded(separated!(both tag(DOT)), Identifier::parse),
+        ),
+        |(expr, to)| {
+            (
+                _Expression::Field {
+                    from: SBox::new(expr.clone()),
+                    to: to.clone(),
+                },
+                Span::from_combination(expr.location.clone(), to.location),
+            )
+        },
+    )(s)
+}
+
+#[recursive_parser]
+fn _cast(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        pair(
+            Expression::parse,
+            preceded(separated!(both tag(AS)), Types::parse),
+        ),
+        |(expr, to)| {
+            (
+                _Expression::Cast {
+                    target: SBox::new(expr.clone()),
+                    to: to.clone(),
+                },
+                Span::from_combination(expr.location.clone(), to.location),
+            )
+        },
+    )(s)
+}
+
+#[recursive_parser]
+fn _index(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        tuple((
+            Expression::parse,
             preceded(separated!(both tag(OP_SQ_BRACKET)), Expression::parse),
             separated!(left tag(CLS_SQ_BRACKET)),
-        ),
-        |(to, last)| {
+        )),
+        |(expr, to, last)| {
             (
                 _Expression::Index {
                     from: SBox::new(expr.clone()),
@@ -197,23 +246,6 @@ fn _index(s: Input, expr: Expression) -> IResult<Input, (_Expression, Span)> {
             )
         },
     )(s)
-}
-
-#[recursive_parser]
-fn _recursive(s: Input) -> IResult<Input, (_Expression, Span)> {
-    let recursive_parsers: Vec<&dyn Fn(Input, Expression) -> IResult<Input, (_Expression, Span)>> =
-        vec![&_call, &_index, &_cast];
-    if let Ok((s, expr)) = Expression::parse(s.clone()) {
-        for parser in recursive_parsers {
-            if let Ok(res) = parser(s.clone(), expr.clone()) {
-                return Ok(res);
-            };
-        }
-    }
-    Err(nom::Err::Error(nom::error::make_error(
-        s,
-        nom::error::ErrorKind::Fix,
-    )))
 }
 
 fn _array(s: Input) -> IResult<Input, (_Expression, Span)> {
@@ -267,7 +299,6 @@ fn _assign(s: Input) -> IResult<Input, (_Expression, Span)> {
 }
 
 fn _func(s: Input) -> IResult<Input, (_Expression, Span)> {
-    println!("func {:?}\n", s);
     map(
         tuple((
             separated!(right tag(VERT_BAR)),

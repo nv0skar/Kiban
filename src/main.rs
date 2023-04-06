@@ -31,11 +31,13 @@ fn main() -> Result<()> {
     // let lexed = TokenStream::parse("for item in hello::meaning return hello.0", None)?;
     // let lexed = TokenStream::parse("while cow::speaks return", None)?;
     // let lexed = TokenStream::parse("if tomorrow_rains return error else return good", None)?;
-    // let lexed = TokenStream::parse("some_value.0 as bool", None)?;
+    // let lexed = TokenStream::parse("some_value.0 as Bool", None)?;
     // let lexed = TokenStream::parse("some_array[some_value]", None)?;
-    let lexed = TokenStream::parse("some_func(hello, bye).0", None)?;
+    // let lexed = TokenStream::parse("some_func(2.343, 2..3)", None)?;
     // let lexed = TokenStream::parse("let hello: UInt32 = pot;", None)?;
     // let lexed = TokenStream::parse("hello;", None)?;
+    let input = "some_func(.=5)";
+    let lexed = TokenStream::parse(input, None)?;
     println!("{}\n", lexed);
     let parsed = Expression::parse(lexed.clone());
     println!("{:#?}", parsed);

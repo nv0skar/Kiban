@@ -32,7 +32,7 @@ use nom::{
 
 /// Tokens that refer to a type
 #[derive(Clone, Display, Debug)]
-pub enum Type {
+pub enum Types {
     Bool,
     #[display(fmt = "Integer ({})", _0)]
     Int(NumberDef),
@@ -41,28 +41,28 @@ pub enum Type {
     Fn,
 }
 
-impl<'a> Parsable<Input<'a>, Self> for Type {
+impl<'a> Parsable<Input<'a>, Self> for Types {
     fn parse(s: Input) -> IResult<Input, Self> {
         alt((
             mapped!("Bool", Self::Bool),
+            map(tag("Fn"), |_| Types::Fn),
             _integer,
             _float,
-            map(tag("Fn"), |_| Type::Fn),
         ))(s)
     }
 }
 
-fn _integer(s: Input) -> IResult<Input, Type> {
+fn _integer(s: Input) -> IResult<Input, Types> {
     map(
         pair(_signed, preceded(tag("Int"), _size)),
-        |(signed, size)| Type::Int(NumberDef::new(signed, size)),
+        |(signed, size)| Types::Int(NumberDef::new(signed, size)),
     )(s)
 }
 
-fn _float(s: Input) -> IResult<Input, Type> {
+fn _float(s: Input) -> IResult<Input, Types> {
     map(
         pair(_signed, preceded(tag("Float"), _size)),
-        |(signed, size)| Type::Float(NumberDef::new(signed, size)),
+        |(signed, size)| Types::Float(NumberDef::new(signed, size)),
     )(s)
 }
 
@@ -79,7 +79,7 @@ fn _size(s: Input) -> IResult<Input, Size> {
     ))(s)
 }
 
-impl PartialEq for Type {
+impl PartialEq for Types {
     fn eq(&self, other: &Self) -> bool {
         discriminant(self) == discriminant(other)
     }

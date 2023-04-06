@@ -21,11 +21,11 @@ use std::mem::discriminant;
 use derive_more::Display;
 use nom::{
     branch::alt,
-    bytes::complete::{take, take_while},
-    character::complete::char,
-    combinator::{map, map_res},
+    bytes::complete::{tag, take, take_while},
+    character::complete::{char, digit1},
+    combinator::{map, opt},
     number::complete::float as float_parse,
-    sequence::delimited,
+    sequence::{delimited, pair},
     IResult,
 };
 use smol_str::SmolStr;
@@ -35,7 +35,7 @@ use smol_str::SmolStr;
 pub enum Literal {
     Bool(bool),
     /// can be parsed into a literal or an identifier
-    #[display(fmt = "{:?} (integer / field)", _0)]
+    #[display(fmt = "{:?} (integer / ident)", _0)]
     Int(isize),
     #[display(fmt = "{:?} (float)", _0)]
     Float(f32),
@@ -58,13 +58,21 @@ fn _boolean(s: Input) -> IResult<Input, Literal> {
 }
 
 fn _integer(s: Input) -> IResult<Input, Literal> {
-    map_res(float_parse, |s| {
-        if s.round() != s {
-            Err(())
-        } else {
-            Ok(Literal::Int(s.round() as isize))
-        }
-    })(s)
+    map(
+        map(
+            pair(opt(tag("-")), digit1),
+            |(sign, num): (Option<Input>, Input)| {
+                if let Some(sign) = sign {
+                    let mut signed_num = sign.fragment().to_string();
+                    signed_num.push_str(&num);
+                    signed_num
+                } else {
+                    num.fragment().to_string()
+                }
+            },
+        ),
+        |s: String| Literal::Int(s.parse().unwrap()),
+    )(s)
 }
 
 fn _float(s: Input) -> IResult<Input, Literal> {
