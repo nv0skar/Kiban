@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    generic::{Definition, Namespace},
-    literal::Int,
-    map_token_with_field, separated, Input,
-};
+use crate::{generic::Namespace, literal::Int, map_token_with_field, separated, Input};
 
 use kiban_commons::*;
 use kiban_lexer::{Types as TypesToken, *};
@@ -38,9 +34,9 @@ node_variant! { Types {
     Integer(NumberDef),
     Float(NumberDef),
     Array(SBox<Types>, Int),
-    Tuple(Vec<Types>),
+    Tuple(SVec<Types>),
     Function {
-        params: Vec<Definition>,
+        params: SVec<Types>,
         expect: Option<SBox<Types>>,
     },
 }}
@@ -81,7 +77,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
                 )),
                 |(first, types, last): (Input, _, Input)| {
                     (
-                        Self::Tuple(types),
+                        Self::Tuple(types.into()),
                         Span::from_combination(first.span(), last.span()),
                     )
                 },
@@ -92,7 +88,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
                     preceded(
                         separated!(both tag(OP_PAREN)),
                         pair(
-                            separated_list0(separated!(both tag(COMMA)), Definition::parse),
+                            separated_list0(separated!(both tag(COMMA)), Types::parse),
                             separated!(left tag(CLS_PAREN)),
                         ),
                     ),
@@ -101,7 +97,7 @@ impl Parsable<Input, (Self, Span)> for _Types {
                 |(first, (params, last_sep), expect): (Input, (_, Input), Option<_>)| {
                     (
                         Self::Function {
-                            params,
+                            params: params.into(),
                             expect: expect.clone().map(|s| SBox::new(s)),
                         },
                         Span::from_combination(first.span(), {

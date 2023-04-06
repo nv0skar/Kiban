@@ -7,5 +7,6 @@
 
 ## <a name="development"></a>発達 🧑‍💻
 ### <a name="developmentTODO"></a>リストを行う 🛸
+- Implement associativity to binary expressions
 - Finish the `ast`'s parser
 - Write the compiler (Potentially using `LLVM`)

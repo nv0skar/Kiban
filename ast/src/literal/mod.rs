@@ -19,7 +19,7 @@ use crate::{map_token_with_field, Input};
 use kiban_commons::*;
 use kiban_lexer::{literal::Literal as Literal_Token, *};
 
-use nom::{branch::alt, bytes::complete::tag, combinator::map, IResult};
+use nom::{branch::alt, combinator::map, IResult};
 use smol_str::SmolStr;
 
 macro_rules! literal {

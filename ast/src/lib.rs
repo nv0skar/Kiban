@@ -58,20 +58,32 @@ macro_rules! separated {
 }
 
 #[macro_export]
+macro_rules! map_token {
+    ($token:path, $type_of:path) => {
+        nom::combinator::map(nom::bytes::complete::tag($token), |s: Input| {
+            ($type_of, s.span())
+        })
+    };
+}
+
+#[macro_export]
 macro_rules! map_token_with_field {
     ($token:path, $variant:path, $type_of:path) => {
-        map(tag($token($variant(Default::default()))), |s: Input| {
-            (
-                $type_of({
-                    if let $token($variant(val)) = s.clone().into() {
-                        val
-                    } else {
-                        panic!("Unexpected token!")
-                    }
-                }),
-                s.span(),
-            )
-        })
+        nom::combinator::map(
+            nom::bytes::complete::tag($token($variant(Default::default()))),
+            |s: Input| {
+                (
+                    $type_of({
+                        if let $token($variant(val)) = s.clone().into() {
+                            val
+                        } else {
+                            panic!("Unexpected token!")
+                        }
+                    }),
+                    s.span(),
+                )
+            },
+        )
     };
 }
 

@@ -16,7 +16,7 @@
 
 use crate::Input;
 
-use kiban_commons::{parser::Parsable, span::Span};
+use kiban_commons::*;
 
 use derive_more::Constructor;
 use nom::{combinator::map, IResult};
@@ -58,12 +58,18 @@ macro_rules! node_variant {
 
 #[derive(Clone, PartialEq, Constructor, Debug)]
 pub struct Node<T> {
-    pub inner: T,
+    pub inner: kiban_commons::SBox<T>,
     pub location: Span,
 }
 
 impl<T: Parsable<Input, (T, Span)>> Parsable<Input, Self> for Node<T> {
     fn parse(s: Input) -> IResult<Input, Self> {
-        map(T::parse, |(s, span)| Node::new(s, span))(s)
+        map(T::parse, |(s, span)| Node::new(SBox::new(s), span))(s)
+    }
+}
+
+impl<T> Into<Node<T>> for (T, Span) {
+    fn into(self) -> Node<T> {
+        Node::new(SBox::new(self.0), self.1)
     }
 }

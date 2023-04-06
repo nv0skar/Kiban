@@ -16,7 +16,7 @@
 
 #![allow(non_snake_case)]
 
-use kiban_ast::{closure::Closure, expression::Expression};
+use kiban_ast::{closure::Closure, expression::Expression, statement::Statement};
 use kiban_commons::parser::Parsable;
 use kiban_lexer::TokenStream;
 
@@ -36,14 +36,10 @@ fn main() -> Result<()> {
     // let lexed = TokenStream::parse("some_func(2.343, 2..3)", None)?;
     // let lexed = TokenStream::parse("let hello: UInt32 = pot;", None)?;
     // let lexed = TokenStream::parse("hello;", None)?;
-    let lexed = TokenStream::parse(
-        "{
-        let some_declaration: Bool = some_value;
-    }",
-        None,
-    )?;
+    // let lexed = TokenStream::parse("false as Fn(Bool) -> UInt32", None)?;
+    let lexed = TokenStream::parse("1 * 1 + 1", None)?;
     println!("{}\n", lexed);
-    let parsed = Closure::parse(lexed.clone());
+    let parsed = Expression::parse(lexed.clone());
     println!("{:#?}", parsed);
     Ok(())
 }

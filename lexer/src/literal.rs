@@ -21,11 +21,11 @@ use std::mem::discriminant;
 use derive_more::Display;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take, take_while},
+    bytes::complete::{take, take_while},
     character::complete::{char, digit1},
-    combinator::{map, opt},
+    combinator::map,
     number::complete::float as float_parse,
-    sequence::{delimited, pair},
+    sequence::delimited,
     IResult,
 };
 use smol_str::SmolStr;
@@ -58,21 +58,7 @@ fn _boolean(s: Input) -> IResult<Input, Literal> {
 }
 
 fn _integer(s: Input) -> IResult<Input, Literal> {
-    map(
-        map(
-            pair(opt(tag("-")), digit1),
-            |(sign, num): (Option<Input>, Input)| {
-                if let Some(sign) = sign {
-                    let mut signed_num = sign.fragment().to_string();
-                    signed_num.push_str(&num);
-                    signed_num
-                } else {
-                    num.fragment().to_string()
-                }
-            },
-        ),
-        |s: String| Literal::Int(s.parse().unwrap()),
-    )(s)
+    map(digit1, |s: Input| Literal::Int(s.parse().unwrap()))(s)
 }
 
 fn _float(s: Input) -> IResult<Input, Literal> {

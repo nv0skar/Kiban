@@ -14,35 +14,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-node_variant! { Binary {
-    Logical(Logical),
-    Comparison(Comparison),
-    Lazy(Lazy),
-}}
+use crate::{map_token, Input};
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum Logical {
-    Addition,
-    Substraction,
-    Multiplication,
-    Division,
-    Exponentiation,
-    Remainder,
-}
+use kiban_commons::*;
+use kiban_lexer::*;
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum Comparison {
-    Eq,
-    NotEq,
-    Greater,
-    Less,
-    GreaterEq,
-    LessEq,
-}
+use nom::{branch::alt, IResult};
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum Lazy {
-    And,
-    Or,
-    XOr,
+node_variant! { Unary { Negative, Negation }}
+
+impl Parsable<Input, (Self, Span)> for _Unary {
+    fn parse(s: Input) -> IResult<Input, (Self, Span)> {
+        alt((
+            map_token!(MINUS, Self::Negative),
+            map_token!(NEGATION, Self::Negation),
+        ))(s)
+    }
 }

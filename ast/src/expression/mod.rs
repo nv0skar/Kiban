@@ -14,22 +14,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod operator;
+pub mod binary;
 pub mod range;
+pub mod unary;
 
 use crate::{
     body::{Body, Parameters, _Body},
-    closure::Closure,
+    closure::{Closure, _Closure},
     generic::{Identifier, Namespace},
     literal::Literal as LiteralTree,
     node::Node,
     separated,
+    statement::Statement,
     types::Types,
     Input,
 };
 
-use operator::Operator;
+use binary::*;
 use range::Range;
+use unary::Unary;
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -38,7 +41,7 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     combinator::{map, opt},
-    multi::{separated_list0, separated_list1},
+    multi::{fold_many0, separated_list0, separated_list1},
     sequence::{pair, preceded, terminated, tuple},
     IResult,
 };
@@ -46,51 +49,56 @@ use nom_recursive::recursive_parser;
 
 node_variant! { Expression {
     Name(Namespace),
-    Refer(SBox<Expression>),
-    Derefer(SBox<Expression>),
-    Closure(Closure),
+    Refer(Expression),
+    Derefer(Expression),
+    Unary(Unary, Expression),
+    Binary {
+        operator: Binary,
+        lhs: Expression,
+        rhs: Expression,
+    },
     Literal(LiteralTree),
-    Op(Operator),
-    Array(Vec<Expression>),
-    Tuple(Vec<Expression>),
+    Closure(Closure),
+    Array(SVec<Expression>),
+    Tuple(SVec<Expression>),
     Func(Body),
     Range(Range),
     Assign {
         name: Identifier,
-        value: SBox<Expression>,
+        value: Expression,
     },
     Field {
-        from: SBox<Expression>,
+        from: Expression,
         to: Identifier,
     },
     Call {
-        to: SBox<Expression>,
-        args: Vec<Expression>,
+        to: Expression,
+        args: SVec<Expression>,
     },
     Index {
-        from: SBox<Expression>,
-        to: SBox<Expression>,
+        from: Expression,
+        to: Expression,
     },
     Cast {
-        target: SBox<Expression>,
+        target: Expression,
         to: Types,
     },
     Cond {
-        check: SBox<Expression>,
-        then: SBox<Expression>,
-        if_not: Option<SBox<Expression>>,
+        check: Expression,
+        then: Expression,
+        if_not: Option<Expression>,
     },
     Loop {
-        repeat: SBox<Expression>,
+        repeat: Expression,
     },
     While {
-        check: SBox<Expression>,
-        repeat: SBox<Expression>,
+        check: Expression,
+        repeat: Expression,
     },
     For {
         item: Identifier,
-        iterable: SBox<Expression>,
-        then: SBox<Expression>,
+        iterable: Expression,
+        then: Expression,
     },
     Continue,
     Break,
@@ -99,24 +107,19 @@ node_variant! { Expression {
 impl Parsable<Input, (Self, Span)> for _Expression {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
+            alt((
+                map(tag(CONTINUE), |s: Input| (Self::Continue, s.span())),
+                map(tag(BREAK), |s: Input| (Self::Continue, s.span())),
+            )),
             _closure,
-            _ref,
-            _deref,
-            _func,
-            _cond,
-            _loop,
-            _for,
-            _while,
-            map(tag(CONTINUE), |s: Input| (Self::Continue, s.span())),
-            map(tag(BREAK), |s: Input| (Self::Continue, s.span())),
+            alt((_ref, _deref)),
+            alt((_func, _cond, _loop, _for, _while)),
+            _unary,
+            _binary,
             _range,
             _assign,
-            _array,
-            _tuple,
-            _call,
-            _field,
-            _index,
-            _cast,
+            alt((_array, _tuple)),
+            alt((_call, _field, _index, _cast)),
             _literal,
             map(Namespace::parse, |s| (Self::Name(s.clone()), s.location)),
         ))(s)
@@ -124,9 +127,29 @@ impl Parsable<Input, (Self, Span)> for _Expression {
 }
 
 fn _closure(s: Input) -> IResult<Input, (_Expression, Span)> {
-    map(Closure::parse, |s| {
-        (_Expression::Closure(s.clone()), s.location)
-    })(s)
+    map(
+        map(
+            tuple((
+                separated!(right tag(OP_BRACE)),
+                fold_many0(
+                    separated!(both Statement::parse),
+                    SVec::new,
+                    |mut buff, s| {
+                        buff.push(s);
+                        buff
+                    },
+                ),
+                separated!(left tag(CLS_BRACE)),
+            )),
+            |(start, statements, last)| {
+                (
+                    _Closure(statements),
+                    Span::from_combination(start.span(), last.span()),
+                )
+            },
+        ),
+        |s| (_Expression::Closure(s.clone().into()), s.1),
+    )(s)
 }
 
 fn _ref(s: Input) -> IResult<Input, (_Expression, Span)> {
@@ -134,7 +157,7 @@ fn _ref(s: Input) -> IResult<Input, (_Expression, Span)> {
         pair(separated!(right tag(REF)), Expression::parse),
         |(ref_token, s)| {
             (
-                _Expression::Refer(SBox::new(s.clone())),
+                _Expression::Refer(s.clone()),
                 Span::from_combination(ref_token.span(), s.location),
             )
         },
@@ -146,11 +169,44 @@ fn _deref(s: Input) -> IResult<Input, (_Expression, Span)> {
         pair(separated!(right tag(REF)), Expression::parse),
         |(ref_token, s)| {
             (
-                _Expression::Refer(SBox::new(s.clone())),
+                _Expression::Refer(s.clone()),
                 Span::from_combination(ref_token.span(), s.location),
             )
         },
     )(s)
+}
+
+fn _unary(s: Input) -> IResult<Input, (_Expression, Span)> {
+    map(
+        pair(separated!(right Unary::parse), Expression::parse),
+        |(op, expr)| {
+            (
+                _Expression::Unary(op.clone(), expr.clone()),
+                Span::from_combination(op.location, expr.location),
+            )
+        },
+    )(s)
+}
+
+#[recursive_parser]
+fn _binary(s: Input) -> IResult<Input, (_Expression, Span)> {
+    alt((
+        addition,
+        substraction,
+        multiplication,
+        division,
+        exponentiation,
+        remainder,
+        eq,
+        not_eq,
+        greater,
+        less,
+        greater_eq,
+        less_eq,
+        and,
+        or,
+        x_or,
+    ))(s)
 }
 
 fn _literal(s: Input) -> IResult<Input, (_Expression, Span)> {
@@ -179,8 +235,8 @@ fn _call(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(expr, to, last)| {
             (
                 _Expression::Call {
-                    to: SBox::new(expr.clone()),
-                    args: to.clone(),
+                    to: expr.clone(),
+                    args: to.clone().into(),
                 },
                 Span::from_combination(expr.location.clone(), last.span()),
             )
@@ -198,7 +254,7 @@ fn _field(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(expr, to)| {
             (
                 _Expression::Field {
-                    from: SBox::new(expr.clone()),
+                    from: expr.clone(),
                     to: to.clone(),
                 },
                 Span::from_combination(expr.location.clone(), to.location),
@@ -217,7 +273,7 @@ fn _cast(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(expr, to)| {
             (
                 _Expression::Cast {
-                    target: SBox::new(expr.clone()),
+                    target: expr.clone(),
                     to: to.clone(),
                 },
                 Span::from_combination(expr.location.clone(), to.location),
@@ -237,8 +293,8 @@ fn _index(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(expr, to, last)| {
             (
                 _Expression::Index {
-                    from: SBox::new(expr.clone()),
-                    to: SBox::new(to.clone()),
+                    from: expr.clone(),
+                    to: to.clone(),
                 },
                 Span::from_combination(expr.location.clone(), last.span()),
             )
@@ -255,7 +311,7 @@ fn _array(s: Input) -> IResult<Input, (_Expression, Span)> {
         )),
         |(start, s, last)| {
             (
-                _Expression::Array(s),
+                _Expression::Array(s.into()),
                 Span::from_combination(start.span(), last.span()),
             )
         },
@@ -271,7 +327,7 @@ fn _tuple(s: Input) -> IResult<Input, (_Expression, Span)> {
         )),
         |(start, s, last)| {
             (
-                _Expression::Tuple(s),
+                _Expression::Tuple(s.into()),
                 Span::from_combination(start.span(), last.span()),
             )
         },
@@ -288,7 +344,7 @@ fn _assign(s: Input) -> IResult<Input, (_Expression, Span)> {
             (
                 _Expression::Assign {
                     name: name.clone(),
-                    value: SBox::new(value.clone()),
+                    value: value.clone(),
                 },
                 Span::from_combination(name.location, value.location),
             )
@@ -304,19 +360,19 @@ fn _func(s: Input) -> IResult<Input, (_Expression, Span)> {
                 map(tag(UNDER_SCORE), |_| None),
                 map(Parameters::parse, |s| Some(s)),
             )),
-            preceded(separated!(both tag(VERT_BAR)), Expression::parse),
+            preceded(separated!(both tag(VERT_BAR)), Closure::parse),
         )),
-        |(from, params, expr)| {
+        |(from, params, clsr)| {
             (
                 _Expression::Func(Node {
-                    inner: _Body {
+                    inner: SBox::new(_Body {
                         params,
-                        closure: SBox::new(expr.clone()),
+                        closure: clsr.clone(),
                         expect: None,
-                    },
-                    location: Span::from_combination(from.span(), expr.clone().location),
+                    }),
+                    location: Span::from_combination(from.span(), clsr.clone().location),
                 }),
-                Span::from_combination(from.span(), expr.location),
+                Span::from_combination(from.span(), clsr.location),
             )
         },
     )(s)
@@ -333,9 +389,9 @@ fn _cond(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(first, check, then, if_not)| {
             (
                 _Expression::Cond {
-                    check: SBox::new(check),
-                    then: SBox::new(then.clone()),
-                    if_not: if_not.clone().map(|s| SBox::new(s)),
+                    check: check,
+                    then: then.clone(),
+                    if_not: if_not.clone(),
                 },
                 Span::from_combination(first.span(), {
                     match if_not {
@@ -354,7 +410,7 @@ fn _loop(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(first, repeat)| {
             (
                 _Expression::Loop {
-                    repeat: SBox::new(repeat.clone()),
+                    repeat: repeat.clone(),
                 },
                 Span::from_combination(first.span(), repeat.location),
             )
@@ -375,8 +431,8 @@ fn _for(s: Input) -> IResult<Input, (_Expression, Span)> {
             (
                 _Expression::For {
                     item,
-                    iterable: SBox::new(iterable),
-                    then: SBox::new(then.clone()),
+                    iterable: iterable,
+                    then: then.clone(),
                 },
                 Span::from_combination(first.span(), then.location),
             )
@@ -394,8 +450,8 @@ fn _while(s: Input) -> IResult<Input, (_Expression, Span)> {
         |(first, check, repeat)| {
             (
                 _Expression::While {
-                    check: SBox::new(check),
-                    repeat: SBox::new(repeat.clone()),
+                    check: check,
+                    repeat: repeat.clone(),
                 },
                 Span::from_combination(first.span(), repeat.location),
             )

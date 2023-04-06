@@ -90,6 +90,10 @@ pub enum Operator {
     #[token = "%"]
     Mod,
 
+    /// negation
+    #[token = "!"]
+    Negation,
+
     /// reference
     #[token = "&"]
     Ref,

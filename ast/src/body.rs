@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{expression::Expression, generic::Definition, separated, types::Types, Input};
+use crate::{closure::Closure, generic::Definition, separated, types::Types, Input};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -23,7 +23,7 @@ use nom::{combinator::map, multi::fold_many1, IResult};
 
 node_def! { Body {
     pub params: Option<Parameters>,
-    pub closure: SBox<Expression>,
+    pub closure: Closure,
     pub expect: Option<Types>,
 }}
 

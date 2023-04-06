@@ -19,31 +19,38 @@ use crate::{separated, statement::Statement, Input};
 use kiban_commons::*;
 use kiban_lexer::*;
 
-use nom::{bytes::complete::tag, combinator::map, multi::fold_many0, sequence::tuple, IResult};
+use nom::{
+    branch::alt, bytes::complete::tag, combinator::map, multi::fold_many0, sequence::tuple, IResult,
+};
 
-node_def!( Closure(pub Vec<Statement>) );
+node_def!( Closure(pub SVec<Statement>) );
 
 impl Parsable<Input, (Self, Span)> for _Closure {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
-        map(
-            tuple((
-                separated!(right tag(OP_BRACE)),
-                fold_many0(
-                    separated!(both Statement::parse),
-                    Vec::new,
-                    |mut buff, s| {
-                        buff.push(s);
-                        buff
-                    },
-                ),
-                separated!(left tag(CLS_BRACE)),
-            )),
-            |(start, statements, last)| {
-                (
-                    Self(statements),
-                    Span::from_combination(start.span(), last.span()),
-                )
-            },
-        )(s)
+        alt((
+            map(
+                tuple((
+                    separated!(right tag(OP_BRACE)),
+                    fold_many0(
+                        separated!(both Statement::parse),
+                        SVec::new,
+                        |mut buff, s| {
+                            buff.push(s);
+                            buff
+                        },
+                    ),
+                    separated!(left tag(CLS_BRACE)),
+                )),
+                |(start, statements, last)| {
+                    (
+                        Self(statements),
+                        Span::from_combination(start.span(), last.span()),
+                    )
+                },
+            ),
+            map(Statement::parse, |s| {
+                (Self(vec![s.clone()].into()), s.location)
+            }),
+        ))(s)
     }
 }
