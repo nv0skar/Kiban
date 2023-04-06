@@ -94,7 +94,6 @@ node_variant! { Expression {
     },
     Continue,
     Break,
-    Return(Option<SBox<Expression>>),
 }}
 
 impl Parsable<Input, (Self, Span)> for _Expression {
@@ -114,7 +113,6 @@ impl Parsable<Input, (Self, Span)> for _Expression {
             _assign,
             _array,
             _tuple,
-            _return,
             _call,
             _field,
             _index,
@@ -400,23 +398,6 @@ fn _while(s: Input) -> IResult<Input, (_Expression, Span)> {
                     repeat: SBox::new(repeat.clone()),
                 },
                 Span::from_combination(first.span(), repeat.location),
-            )
-        },
-    )(s)
-}
-
-fn _return(s: Input) -> IResult<Input, (_Expression, Span)> {
-    map(
-        pair(tag(RETURN), separated!(left opt(Expression::parse))),
-        |(first, rtrn_value)| {
-            (
-                _Expression::Return(rtrn_value.clone().map(|s| SBox::new(s))),
-                Span::from_combination(first.span(), {
-                    match rtrn_value {
-                        Some(value) => value.location,
-                        None => first.span(),
-                    }
-                }),
             )
         },
     )(s)

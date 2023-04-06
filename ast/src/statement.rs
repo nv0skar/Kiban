@@ -14,12 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    expression::{Expression, _Expression},
-    generic::Definition,
-    node::Node,
-    separated, Input,
-};
+use crate::{expression::Expression, generic::Definition, separated, Input};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -38,46 +33,39 @@ node_variant! { Statement {
         declaration: Definition,
         value: Option<Expression>,
     },
+    Return(Option<Expression>),
 }}
 
 impl Parsable<Input, (Self, Span)> for _Statement {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
             map(
-                pair(_declaration, separated!(both tag(SEMICOLON))),
-                |((declaration, dec_span), last)| {
-                    (declaration, Span::from_combination(dec_span, last.span()))
+                pair(
+                    alt((_declaration, _return)),
+                    separated!(left tag(SEMICOLON)),
+                ),
+                |((statement, statement_location), last)| {
+                    (
+                        statement,
+                        Span::from_combination(statement_location, last.span()),
+                    )
                 },
             ),
-            alt((
-                map(
-                    pair(_expression, separated!(both tag(SEMICOLON))),
-                    |((expression, exp_span), last)| {
-                        (expression, Span::from_combination(exp_span, last.span()))
-                    },
-                ),
-                map(_expression, |(s, location)| {
-                    if let _Statement::Expression(expr) = s {
+            map(
+                pair(Expression::parse, opt(separated!(left tag(SEMICOLON)))),
+                |(expr, semicolon)| {
+                    if let Some(last) = semicolon {
                         (
-                            _Statement::Expression(Node {
-                                inner: _Expression::Return(Some(SBox::new(expr))),
-                                location: location.clone(),
-                            }),
-                            location,
+                            _Statement::Expression(expr.clone()),
+                            Span::from_combination(expr.location, last.span()),
                         )
                     } else {
-                        panic!("Expected an expression for return inferring!")
+                        (_Statement::Return(Some(expr.clone())), expr.location)
                     }
-                }),
-            )),
+                },
+            ),
         ))(s)
     }
-}
-
-fn _expression(s: Input) -> IResult<Input, (_Statement, Span)> {
-    map(Expression::parse, |s| {
-        (_Statement::Expression(s.clone()), s.location)
-    })(s)
 }
 
 fn _declaration(s: Input) -> IResult<Input, (_Statement, Span)> {
@@ -103,6 +91,23 @@ fn _declaration(s: Input) -> IResult<Input, (_Statement, Span)> {
                         }
                     }),
                 ),
+            )
+        },
+    )(s)
+}
+
+fn _return(s: Input) -> IResult<Input, (_Statement, Span)> {
+    map(
+        pair(tag(RETURN), separated!(left opt(Expression::parse))),
+        |(first, rtrn_value)| {
+            (
+                _Statement::Return(rtrn_value.clone().map(|s| s)),
+                Span::from_combination(first.span(), {
+                    match rtrn_value {
+                        Some(value) => value.location,
+                        None => first.span(),
+                    }
+                }),
             )
         },
     )(s)
