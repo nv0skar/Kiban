@@ -14,73 +14,56 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{mapped, Input, Parsable};
+use crate::{Input, Lexeme, Token};
+
+use kiban_commons::*;
 
 use std::mem::discriminant;
 
+use compact_str::CompactString;
 use derive_more::Display;
-use nom::{
-    branch::alt,
-    bytes::complete::{take, take_while},
-    character::complete::{char, digit1},
-    combinator::map,
-    number::complete::float as float_parse,
-    sequence::delimited,
-    IResult,
-};
-use smol_str::SmolStr;
 
 /// Tokens that store a literal
 #[derive(Clone, Display, Debug)]
 pub enum Literal {
     Bool(bool),
     /// can be parsed into a literal or an identifier
-    #[display(fmt = "{:?} (integer / ident)", _0)]
-    Int(isize),
-    #[display(fmt = "{:?} (float)", _0)]
+    #[display(fmt = "{} (integer / ident)", _0)]
+    Int(usize),
+    #[display(fmt = "{} (float)", _0)]
     Float(f32),
     #[display(fmt = "{:?} (char)", _0)]
     Char(char),
     #[display(fmt = "{:?} (string)", _0)]
-    String(SmolStr),
+    String(CompactString),
 }
 
-impl<'a> Parsable<Input<'a>, Self> for Literal {
-    fn parse(s: Input) -> IResult<Input, Self> {
-        alt((_boolean, _integer, _float, _character, _string))(s)
+impl Lexeme for Literal {
+    fn parse(s: &mut Input) -> Option<(Token, Span)> {
+        if let Some(span) = s.consume_specific("true") {
+            Some((Token::Literal(Self::Bool(true)), span))
+        } else if let Some(span) = s.consume_specific("false") {
+            Some((Token::Literal(Self::Bool(false)), span))
+        } else if let Some((content, span)) = s.consume_delimited("\'", "\'") {
+            Some((
+                Token::Literal(Self::Char(content.chars().next().unwrap())),
+                span,
+            ))
+        } else if let Some((content, span)) = s.consume_delimited("\"", "\"") {
+            Some((Token::Literal(Self::String(content)), span))
+        } else if let Some(((is_decimal, number), span)) = s.consume_num() {
+            Some((
+                Token::Literal(if !is_decimal {
+                    Self::Int(number.parse().unwrap())
+                } else {
+                    Self::Float(number.parse().unwrap())
+                }),
+                span,
+            ))
+        } else {
+            None
+        }
     }
-}
-
-fn _boolean(s: Input) -> IResult<Input, Literal> {
-    map(alt((mapped!("true", true), mapped!("false", false))), |s| {
-        Literal::Bool(s)
-    })(s)
-}
-
-fn _integer(s: Input) -> IResult<Input, Literal> {
-    map(digit1, |s: Input| Literal::Int(s.parse().unwrap()))(s)
-}
-
-fn _float(s: Input) -> IResult<Input, Literal> {
-    map(float_parse, |s| Literal::Float(s))(s)
-}
-
-fn _character(s: Input) -> IResult<Input, Literal> {
-    map(
-        delimited(char('\''), take(1_usize), char('\'')),
-        |s: Input| Literal::Char(s.chars().next().unwrap()),
-    )(s)
-}
-
-fn _string(s: Input) -> IResult<Input, Literal> {
-    map(
-        delimited(
-            char('"'),
-            take_while(|_c: char| -> bool { true }),
-            char('"'),
-        ),
-        |s: Input| Literal::String(s.into()),
-    )(s)
 }
 
 impl PartialEq for Literal {

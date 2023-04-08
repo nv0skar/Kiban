@@ -17,52 +17,38 @@
 pub mod comment;
 pub mod keyword;
 pub mod literal;
-pub mod operator;
 pub mod punctuation;
-pub mod types;
 
 pub use comment::*;
 pub use keyword::*;
 pub use literal::*;
-pub use operator::*;
 pub use punctuation::*;
-pub use types::*;
 
 use kiban_commons::*;
-use kiban_error::*;
 
 use std::{
     fmt::Display,
     iter::Enumerate,
     mem::discriminant,
     ops::{Range, RangeFrom, RangeFull, RangeTo},
-    path::PathBuf,
 };
 
+use compact_str::{CompactString, ToCompactString};
 use derive_more::{Constructor, Display};
-use miette::NamedSource;
 use nom::{
-    branch::alt,
-    bytes::complete::take_while1,
-    character::{complete::anychar, is_alphanumeric},
-    combinator::{consumed, map},
-    multi::many0,
-    Compare, CompareResult, FindSubstring, IResult, InputIter, InputLength, InputTake, Needed,
-    Offset, Slice,
+    Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, Needed, Offset, Slice,
 };
-use nom_locate::LocatedSpan;
 use nom_recursive::{HasRecursiveInfo, HasRecursiveType, RecursiveInfo};
+use rayon::prelude::*;
 use smallvec::SmallVec;
-use smol_str::SmolStr;
 
-#[macro_export]
-macro_rules! mapped {
-    ($name:expr, $type_of:expr) => {
-        nom::combinator::map(nom::bytes::complete::tag($name), |_| $type_of)
-    };
+pub trait Lexeme {
+    fn parse(s: &mut Input) -> Option<(Token, Span)>;
 }
 
-type Input<'a> = LocatedSpan<&'a str, ()>;
+/// input type for the lexer that keeps track of the string's offset relative to the source
+#[derive(Clone, Constructor, Default, Debug)]
+pub struct Input(usize, CompactString);
 
 /// token stream with recursive info
 #[derive(Clone, Constructor, Default, Debug)]
@@ -76,65 +62,206 @@ type _TokenStream = SVec<(Token, Span)>;
 #[display(fmt = "{}")]
 pub enum Token {
     #[display(fmt = "{} (id)", _0)]
-    Identifier(SmolStr),
+    Identifier(CompactString),
     #[display(fmt = "{} (kw)", _0)]
     Keyword(Keyword),
-    #[display(fmt = "{} (op)", _0)]
-    Operator(Operator),
     #[display(fmt = "{} (punct)", _0)]
     Punctuation(Punctuation),
-    #[display(fmt = "{} (type)", _0)]
-    Types(Types),
     #[display(fmt = "{} (lit)", _0)]
     Literal(Literal),
     #[display(fmt = "{} (comment)", _0)]
     Comment(Comment),
-    #[display(fmt = "{} (illegal)", _0)]
-    Illegal(char),
+    #[display(fmt = "{} (unknown)", _0)]
+    Unknown(char),
+}
+
+impl Input {
+    pub fn digest(self) -> SVec<Self> {
+        let input = self.1.escape_default().collect::<SVec<_>>();
+        let input_iter = input.iter().enumerate();
+        let (mut buffer, mut ctrl_flags): (SVec<Option<Input>>, [bool; 3]) =
+            (SVec::from_elem(None, 1), [bool::default(); 3]);
+        for (ch_offset, ch) in input_iter {
+            if ch.is_whitespace() && !ctrl_flags[0] && !ctrl_flags[1] && !ctrl_flags[2] {
+                buffer.push(None)
+            } else {
+                if ch_offset != 0 {
+                    if *ch == '"' && input[ch_offset - 1] != '\\' {
+                        ctrl_flags[0] ^= true;
+                    }
+                    if *ch == '/' && input[ch_offset - 1] == '/' {
+                        ctrl_flags[1] = true;
+                    }
+                    if *ch == 'n' && input[ch_offset - 1] == '\\' {
+                        ctrl_flags[1] = false;
+                    }
+                    if *ch == '*' && input[ch_offset - 1] == '/' {
+                        ctrl_flags[2] = true;
+                    }
+                    if *ch == '/' && input[ch_offset - 1] == '*' {
+                        ctrl_flags[2] = false;
+                    }
+                }
+                let last_elem = buffer.last_mut().unwrap();
+                if let Some(elem) = last_elem {
+                    elem.1.push(*ch)
+                } else {
+                    *last_elem = Some(Self(ch_offset, ch.to_compact_string()));
+                }
+            }
+        }
+        buffer.iter().filter_map(|s| s.clone()).collect()
+    }
+
+    pub fn tokenize(&mut self) -> _TokenStream {
+        let mut buffer: SVec<(Token, Span)> = SVec::new();
+        while self.can_consume() {
+            if let Some(kw) = Keyword::parse(self) {
+                buffer.push(kw);
+                continue;
+            } else if let Some(commnt) = Comment::parse(self) {
+                buffer.push(commnt);
+                continue;
+            } else if let Some(punc) = Punctuation::parse(self) {
+                buffer.push(punc);
+                continue;
+            } else if let Some(lit) = Literal::parse(self) {
+                buffer.push(lit);
+                continue;
+            } else if let Some((id, span)) = self.consume_ident() {
+                buffer.push((Token::Identifier(id), span));
+            } else {
+                let (any_char, span) = self.consume_any_char();
+                buffer.push((Token::Unknown(any_char), span));
+                continue;
+            }
+        }
+        buffer
+    }
+
+    fn take(&mut self, n: usize) {
+        assert!(n != 0, "Cannot take 0 characters from input!");
+        self.0 += n;
+        self.1 = self.1.get(n..).unwrap().into();
+    }
+
+    fn can_consume(&self) -> bool {
+        !self.1.is_empty()
+    }
+
+    pub fn consume_specific(&mut self, txt: &str) -> Option<Span> {
+        if let (offset, Some(to_cmp)) = (self.0, self.1.get(..txt.len())) {
+            if txt == to_cmp {
+                self.take(txt.len());
+                return Some(Span::new(offset, offset + txt.len() - 1));
+            }
+        }
+        None
+    }
+
+    pub fn consume_from(&mut self, txt: &str) -> Option<(CompactString, Span)> {
+        if let Some(to_cmp) = self.1.get(..txt.len()) {
+            if txt == to_cmp {
+                let rest = (self.1.clone(), Span::new(self.0, self.0 + self.1.len() - 1));
+                self.take(self.1.len());
+                return Some(rest);
+            }
+        }
+        None
+    }
+
+    pub fn consume_delimited(&mut self, from: &str, until: &str) -> Option<(CompactString, Span)> {
+        if let Some(to_cmp) = self.1.get(..from.len()) {
+            if from == to_cmp {
+                let input = self.1.chars().collect::<SVec<_>>();
+                let input_iter = input.iter().enumerate();
+                let mut buffer: SVec<char> = SVec::new();
+                for (ch_offset, ch) in input_iter {
+                    buffer.push(*ch);
+                    if ch_offset >= until.len() {
+                        if until
+                            == input
+                                .get(ch_offset - until.len() + 1..ch_offset + 1)
+                                .unwrap()
+                                .iter()
+                                .collect::<CompactString>()
+                        {
+                            let delimited = (
+                                buffer.iter().collect::<CompactString>(),
+                                Span::new(self.0, self.0 + buffer.len() - 1),
+                            );
+                            self.take(buffer.len());
+                            return Some(delimited);
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    pub fn consume_num(&mut self) -> Option<((bool, CompactString), Span)> {
+        let (mut is_decimal, mut buffer) = (bool::default(), CompactString::default());
+        for ch in self.1.escape_default() {
+            if ch.is_numeric() {
+                buffer.push(ch);
+            } else if ch == '.' {
+                if is_decimal {
+                    return None;
+                }
+                is_decimal = true;
+                buffer.push(ch)
+            } else {
+                break;
+            }
+        }
+        if !buffer.is_empty() {
+            let number_span = Span::new(self.0, self.0 + buffer.len() - 1);
+            self.take(buffer.len());
+            Some(((is_decimal, buffer), number_span))
+        } else {
+            None
+        }
+    }
+
+    pub fn consume_ident(&mut self) -> Option<(CompactString, Span)> {
+        let first_char = self.1.escape_default().next().unwrap();
+        if !first_char.is_digit(10) && !first_char.is_whitespace() {
+            let mut buffer: SVec<char> = SVec::new();
+            for ch in self.1.escape_default() {
+                if ch.is_alphanumeric() || ch == '_' {
+                    buffer.push(ch)
+                } else {
+                    break;
+                }
+            }
+            let span_res = Span::new(self.0, self.0 + buffer.len() - 1);
+            self.take(buffer.len());
+            Some((buffer.iter().collect(), span_res))
+        } else {
+            None
+        }
+    }
+
+    pub fn consume_any_char(&mut self) -> (char, Span) {
+        let (offset, any_char) = (self.0, self.1.chars().next().unwrap());
+        self.take(1);
+        (any_char, Span::new(offset, offset + 1))
+    }
 }
 
 impl TokenStream {
-    pub fn parse<'b>(input: &str, path: Option<&PathBuf>) -> Result<Self, Error> {
-        let input = LocatedSpan::from(input);
-        let name = match path {
-            Some(path) => path.to_str().unwrap(),
-            None => "undefined path",
-        };
-        match many0(Token::parse)(input) {
-            Ok((remainder, many_syntax)) => {
-                if remainder.is_empty() {
-                    Ok(Self(many_syntax.into(), None))
-                } else {
-                    Err(Error {
-                        src: NamedSource::new(name, input.to_string()),
-                        location: Some(Span::new(0, remainder.chars().count()).into()),
-                        error: Kinds::Lexer(Some(String::from(
-                            "Some tokens haven't been consumed!",
-                        ))),
-                    })
-                }
-            }
-            Err(error) => match error {
-                nom::Err::Incomplete(needed) => Err(Error {
-                    src: NamedSource::new(name, input.to_string()),
-                    location: None,
-                    error: Kinds::Lexer(Some(format!(
-                        "More data is needed to complete parsing! ({:?})",
-                        needed
-                    ))),
-                }),
-                nom::Err::Error(error) => Err(Error {
-                    src: NamedSource::new(name, error.input.to_string()),
-                    location: Some(Span::new(0, error.input.chars().count()).into()),
-                    error: Kinds::Lexer(Some(format!("Error! {:?}", error.code))),
-                }),
-                nom::Err::Failure(failure) => Err(Error {
-                    src: NamedSource::new(name, failure.input.to_string()),
-                    location: Some(Span::new(0, failure.input.chars().count()).into()),
-                    error: Kinds::Lexer(Some(format!("Failure! {:?}", failure.code))),
-                }),
-            },
-        }
+    pub fn parse(input: &str) -> Self {
+        Self(
+            Input::from(input)
+                .digest()
+                .par_iter()
+                .map(|s| s.clone().tokenize().to_vec())
+                .flatten()
+                .collect::<Vec<(Token, Span)>>()
+                .into(),
+            None,
+        )
     }
 }
 
@@ -175,32 +302,6 @@ impl PartialEq for TokenStream {
         } else {
             self.0 == other.0
         }
-    }
-}
-
-impl<'a> Parsable<Input<'a>, (Token, Span)> for Token {
-    fn parse(s: Input) -> IResult<Input, (Token, Span)> {
-        map(
-            consumed(alt((
-                map(Comment::parse, |s| Self::Comment(s)),
-                map(Keyword::parse, |s| Self::Keyword(s)),
-                map(Punctuation::parse, |s| Self::Punctuation(s)),
-                map(Literal::parse, |s| Self::Literal(s)),
-                map(Operator::parse, |s| Self::Operator(s)),
-                map(Types::parse, |s| Self::Types(s)),
-                map(
-                    take_while1(|c: char| -> bool { is_alphanumeric(c as u8) || c == '_' }),
-                    |s: Input| Token::Identifier(s.into()),
-                ),
-                map(anychar, |s| Self::Illegal(s)),
-            ))),
-            |(consumed, token)| {
-                (
-                    token,
-                    Span::from_offset(s.location_offset(), consumed.chars().count()),
-                )
-            },
-        )(s)
     }
 }
 
@@ -351,6 +452,12 @@ impl InputLength for Token {
     #[inline]
     fn input_len(&self) -> usize {
         1
+    }
+}
+
+impl From<&str> for Input {
+    fn from(value: &str) -> Self {
+        Self(0, value.into())
     }
 }
 

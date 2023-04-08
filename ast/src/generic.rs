@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{separated, types::Types, Input};
+use crate::{types::Types, Input, Parsable};
 
 use kiban_commons::*;
 use kiban_lexer::*;
 
+use compact_str::{CompactString, ToCompactString};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -27,25 +28,22 @@ use nom::{
     sequence::{pair, preceded},
     IResult,
 };
-use smol_str::SmolStr;
 
-node_def!( Identifier(pub SmolStr) );
+node_def!( Identifier(pub CompactString) );
 
 impl Parsable<Input, (Self, Span)> for _Identifier {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         map(
             alt((
-                tag(Token::Identifier(SmolStr::default())),
-                tag(Token::Literal(Literal::Int(isize::default()))),
+                tag(Token::Identifier(CompactString::default())),
+                tag(Token::Literal(Literal::Int(usize::default()))),
             )),
             |s: Input| {
                 (
                     Self({
                         match Into::<Token>::into(s.clone()) {
                             Token::Identifier(id) => id,
-                            Token::Literal(Literal::Int(id)) => {
-                                SmolStr::from((id as usize).to_string())
-                            }
+                            Token::Literal(Literal::Int(id)) => (id as usize).to_compact_string(),
                             _ => panic!("Expected identifier or literal integer!"),
                         }
                     }),
@@ -64,13 +62,7 @@ node_def! { Definition {
 impl Parsable<Input, (Self, Span)> for _Definition {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         map(
-            pair(
-                Identifier::parse,
-                opt(preceded(
-                    separated!(both tag(Token::Punctuation(Punctuation::Colon))),
-                    Types::parse,
-                )),
-            ),
+            pair(Identifier::parse, opt(preceded(tag(COLON), Types::parse))),
             |(id, kind)| {
                 (
                     Self {
@@ -94,13 +86,7 @@ node_def!( Namespace(pub SVec<Identifier>) );
 impl Parsable<Input, (Self, Span)> for _Namespace {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         map(
-            separated_list1(
-                separated!(both pair(
-                    tag(Token::Punctuation(Punctuation::Colon)),
-                    tag(Token::Punctuation(Punctuation::Colon)),
-                )),
-                Identifier::parse,
-            ),
+            separated_list1(pair(tag(COLON), tag(COLON)), Identifier::parse),
             |s| {
                 (
                     Self(SVec::from(s.clone())),

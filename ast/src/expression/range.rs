@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{generic::Identifier, separated, Input};
+use crate::{generic::Identifier, Input, Parsable};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -46,7 +46,7 @@ fn _bounded(s: Input) -> IResult<Input, (_Range, Span)> {
     map(
         separated_pair(
             Identifier::parse,
-            separated!(both tag(RANGE)),
+            pair(tag(DOT), tag(DOT)),
             Identifier::parse,
         ),
         |(from, to)| {
@@ -60,8 +60,8 @@ fn _bounded(s: Input) -> IResult<Input, (_Range, Span)> {
 
 fn _from(s: Input) -> IResult<Input, (_Range, Span)> {
     map(
-        pair(Identifier::parse, separated!(left tag(RANGE))),
-        |(from, last)| {
+        pair(Identifier::parse, pair(tag(DOT), tag(DOT))),
+        |(from, (_, last))| {
             (
                 _Range::From(from.clone()),
                 Span::from_combination(from.location, last.span()),
@@ -72,8 +72,8 @@ fn _from(s: Input) -> IResult<Input, (_Range, Span)> {
 
 fn _to(s: Input) -> IResult<Input, (_Range, Span)> {
     map(
-        pair(separated!(right tag(RANGE)), Identifier::parse),
-        |(start, to)| {
+        pair(pair(tag(DOT), tag(DOT)), Identifier::parse),
+        |((start, _), to)| {
             (
                 _Range::To(to.clone()),
                 Span::from_combination(start.span(), to.location),
@@ -86,7 +86,7 @@ fn _inclusive(s: Input) -> IResult<Input, (_Range, Span)> {
     map(
         separated_pair(
             Identifier::parse,
-            separated!(both tag(RANGE_INCLUSIVE)),
+            pair(tag(DOT), tag(EQ)),
             Identifier::parse,
         ),
         |(from, to)| {
@@ -100,8 +100,8 @@ fn _inclusive(s: Input) -> IResult<Input, (_Range, Span)> {
 
 fn _to_inclusive(s: Input) -> IResult<Input, (_Range, Span)> {
     map(
-        pair(separated!(right tag(RANGE_INCLUSIVE)), Identifier::parse),
-        |(start, to)| {
+        pair(pair(tag(DOT), tag(EQ)), Identifier::parse),
+        |((start, _), to)| {
             (
                 _Range::ToInclusive(to.clone()),
                 Span::from_combination(start.span(), to.location),
@@ -111,10 +111,10 @@ fn _to_inclusive(s: Input) -> IResult<Input, (_Range, Span)> {
 }
 
 fn _full(s: Input) -> IResult<Input, (_Range, Span)> {
-    map(tag(RANGE), |s: Input| {
+    map(pair(tag(DOT), tag(DOT)), |(start, end): (Input, Input)| {
         (
             _Range::Full,
-            Span::from_combination(s.clone().span(), s.span()),
+            Span::from_combination(start.span(), end.span()),
         )
     })(s)
 }

@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{closure::Closure, generic::Definition, separated, types::Types, Input};
+use crate::{closure::Closure, generic::Definition, types::Types, Input, Parsable};
 
 use kiban_commons::*;
-use kiban_lexer::*;
 
 use nom::{combinator::map, multi::fold_many1, IResult};
 
@@ -32,14 +31,10 @@ node_def!(Parameters(SVec<Definition>));
 impl Parsable<Input, (Self, Span)> for _Parameters {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         map(
-            fold_many1(
-                separated!(both Definition::parse),
-                SVec::new,
-                |mut buff, s| {
-                    buff.push(s);
-                    buff
-                },
-            ),
+            fold_many1(Definition::parse, SVec::new, |mut buff, s| {
+                buff.push(s);
+                buff
+            }),
             |s| {
                 (
                     Self(s.clone()),

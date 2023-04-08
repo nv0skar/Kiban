@@ -14,13 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{map_token_with_field, Input};
+use crate::{map_token_with_field, Input, Parsable};
 
 use kiban_commons::*;
 use kiban_lexer::{literal::Literal as Literal_Token, *};
 
+use compact_str::CompactString;
 use nom::{branch::alt, combinator::map, IResult};
-use smol_str::SmolStr;
 
 macro_rules! literal {
     ($name:ident($type:ty), $token:path) => {
@@ -33,7 +33,7 @@ macro_rules! literal {
                 }
             }
 
-            impl Parsable<Input, (Self, Span)> for [<_ $name>] {
+            impl crate::Parsable<Input, (Self, Span)> for [<_ $name>] {
                 fn parse(s: Input) -> IResult<Input, (Self, Span)> {
                     map_token_with_field!(Token::Literal, $token, Self)(s)
                 }
@@ -51,10 +51,10 @@ node_variant! { Literal {
 }}
 
 literal!(Bool(bool), Literal_Token::Bool);
-literal!(Int(isize), Literal_Token::Int);
+literal!(Int(usize), Literal_Token::Int);
 literal!(Float(f32), Literal_Token::Float);
 literal!(Char(char), Literal_Token::Char);
-literal!(String(SmolStr), Literal_Token::String);
+literal!(String(CompactString), Literal_Token::String);
 
 impl Parsable<Input, (Self, Span)> for _Literal {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {

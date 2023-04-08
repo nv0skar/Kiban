@@ -14,12 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{mapped, Input, Parsable};
-
 use kiban_lexer_derive::TokenParser;
 
 use derive_more::Display;
-use nom::character::complete::{newline, space1};
 
 #[derive(Clone, PartialEq, TokenParser, Display, Debug)]
 pub enum Punctuation {
@@ -35,18 +32,32 @@ pub enum Punctuation {
     OpSqBracket,
     #[token = "]"]
     ClsSqBracket,
-    #[token = " <"]
+    #[token = "<"]
     OpChevron,
-    #[token = "> "]
+    #[token = ">"]
     ClsChevron,
+    #[token = "="]
+    Eq,
     #[token = "|"]
     VertBar,
+    #[token = "+"]
+    Plus,
+    #[token = "-"]
+    Line,
     #[token = "_"]
-    UnderScore,
-    #[token = ".."]
-    Range,
-    #[token = ".="]
-    RangeInclusive,
+    Underline,
+    #[token = "*"]
+    Star,
+    #[token = "/"]
+    Slash,
+    #[token = "^"]
+    Caret,
+    #[token = "%"]
+    Percent,
+    #[token = "&"]
+    Amprsnd,
+    #[token = "!"]
+    Exclmtn,
     #[token = ","]
     Comma,
     #[token = "."]
@@ -55,8 +66,4 @@ pub enum Punctuation {
     Colon,
     #[token = ";"]
     Semicolon,
-    #[token(space1)]
-    Space,
-    #[token(newline)]
-    Newline,
 }

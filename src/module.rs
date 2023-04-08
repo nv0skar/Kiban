@@ -60,7 +60,7 @@ impl<'a> Module<'a> {
     }
 
     pub fn set_source(&mut self, source: &'a str) -> Result<(), Error> {
-        let _lexis = TokenStream::parse(source, None)?;
+        let _lexis = TokenStream::parse(source);
         todo!()
     }
 }
@@ -75,7 +75,7 @@ impl<'a> TryFrom<PathBuf> for Module<'a> {
             location: None,
             error: Kinds::FSError,
         })?;
-        let _lexis = TokenStream::parse(&source, Some(&value))?;
+        let _lexis = TokenStream::parse(&source);
         todo!()
     }
 }

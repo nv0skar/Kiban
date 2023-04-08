@@ -14,14 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{mapped, Input, Parsable};
-
 use kiban_lexer_derive::TokenParser;
 
 use derive_more::Display;
 
 #[derive(Clone, PartialEq, TokenParser, Display, Debug)]
 pub enum Keyword {
+    /// public declaration
+    #[token = "pub"]
+    Pub,
+
     /// imports declaration
     #[token = "use"]
     Use,
@@ -77,6 +79,14 @@ pub enum Keyword {
     /// interrupt iterable
     #[token = "break"]
     Break,
+
+    /// bool type
+    #[token = "bool"]
+    Bool,
+
+    /// fn type
+    #[token = "Fn"]
+    FnTy,
 
     /// return from a function
     #[token = "return"]

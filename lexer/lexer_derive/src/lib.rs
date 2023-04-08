@@ -26,7 +26,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
     if let Data::Enum(DataEnum { variants, .. }) = data {
         for variant in variants {
             let mut attrs = variant.attrs.iter();
-            let (field, (token, is_str)) = (
+            let (field, token) = (
                 variant.ident.to_token_stream(),
                 loop {
                     let (path, value) = match &attrs.next().unwrap().meta {
@@ -36,8 +36,8 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     };
                     if path.is_ident("token") {
                         break match value {
-                            syn::Expr::Lit(literal) => (literal.lit.to_token_stream(), true),
-                            _ => (value.to_token_stream(), false),
+                            syn::Expr::Lit(literal) => literal.lit.to_token_stream(),
+                            _ => panic!("Token is not a literal string!"),
                         };
                     }
                 },
@@ -51,13 +51,10 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 .into_iter(),
             );
             parser_alts.extend(
-                TokenStream::from(match is_str {
-                    true => quote! {
-                        mapped!(#token, Self::#field),
-                    },
-                    false => quote! {
-                        nom::combinator::map(#token, |_| Self::#field),
-                    },
+                TokenStream::from(quote! {
+                    if let Some(span) = s.consume_specific(#token) {
+                        return Some((crate::Token::#ident(Self::#field), span));
+                    }
                 })
                 .into_iter(),
             )
@@ -67,11 +64,10 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
     }
     let output = quote! {
         #element_refs
-        impl<'a> Parsable<Input<'a>, Self> for #ident {
-            fn parse(s: Input) -> nom::IResult<Input, Self> {
-                nom::branch::alt((
-                    #parser_alts
-                ))(s)
+        impl crate::Lexeme for #ident {
+            fn parse(s: &mut crate::Input) -> Option<(crate::Token, kiban_commons::Span)> {
+                #parser_alts
+                None
             }
         }
     };

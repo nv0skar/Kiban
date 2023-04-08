@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{separated, statement::Statement, Input};
+use crate::{statement::Statement, Input, Parsable};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -30,16 +30,12 @@ impl Parsable<Input, (Self, Span)> for _Closure {
         alt((
             map(
                 tuple((
-                    separated!(right tag(OP_BRACE)),
-                    fold_many0(
-                        separated!(both Statement::parse),
-                        SVec::new,
-                        |mut buff, s| {
-                            buff.push(s);
-                            buff
-                        },
-                    ),
-                    separated!(left tag(CLS_BRACE)),
+                    tag(OP_BRACE),
+                    fold_many0(Statement::parse, SVec::new, |mut buff, s| {
+                        buff.push(s);
+                        buff
+                    }),
+                    tag(CLS_BRACE),
                 )),
                 |(start, statements, last)| {
                     (

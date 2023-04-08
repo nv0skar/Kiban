@@ -26,36 +26,12 @@ pub mod literal;
 pub mod statement;
 pub mod types;
 
+pub use node::Parsable;
+
 use item::Item;
 
 use kiban_commons::SVec;
 use kiban_lexer::TokenStream;
-
-#[macro_export]
-macro_rules! separator {
-    () => {
-        nom::combinator::map(
-            nom::multi::many0(nom::branch::alt((
-                nom::bytes::complete::tag(SPACE),
-                nom::bytes::complete::tag(NEWLINE),
-            ))),
-            |_| (),
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! separated {
-    (left $parser:expr) => {
-        nom::sequence::preceded(crate::separator!(), $parser)
-    };
-    (right $parser:expr) => {
-        nom::sequence::terminated($parser, crate::separator!())
-    };
-    (both $parser:expr) => {
-        nom::sequence::delimited(crate::separator!(), $parser, crate::separator!())
-    };
-}
 
 #[macro_export]
 macro_rules! map_token {
@@ -63,6 +39,20 @@ macro_rules! map_token {
         nom::combinator::map(nom::bytes::complete::tag($token), |s: Input| {
             ($type_of, s.span())
         })
+    };
+    (($first_token:path, $second_token:path), $type_of:path) => {
+        nom::combinator::map(
+            nom::sequence::pair(
+                nom::bytes::complete::tag($first_token),
+                nom::bytes::complete::tag($second_token),
+            ),
+            |(start, end): (Input, Input)| {
+                (
+                    $type_of,
+                    kiban_commons::Span::from_combination(start.span(), end.span()),
+                )
+            },
+        )
     };
 }
 

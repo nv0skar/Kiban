@@ -24,10 +24,9 @@ use crate::{
     generic::{Identifier, Namespace},
     literal::Literal as LiteralTree,
     node::Node,
-    separated,
     statement::Statement,
     types::Types,
-    Input,
+    Input, Parsable,
 };
 
 use binary::*;
@@ -130,16 +129,12 @@ fn _closure(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         map(
             tuple((
-                separated!(right tag(OP_BRACE)),
-                fold_many0(
-                    separated!(both Statement::parse),
-                    SVec::new,
-                    |mut buff, s| {
-                        buff.push(s);
-                        buff
-                    },
-                ),
-                separated!(left tag(CLS_BRACE)),
+                tag(OP_BRACE),
+                fold_many0(Statement::parse, SVec::new, |mut buff, s| {
+                    buff.push(s);
+                    buff
+                }),
+                tag(CLS_BRACE),
             )),
             |(start, statements, last)| {
                 (
@@ -153,39 +148,30 @@ fn _closure(s: Input) -> IResult<Input, (_Expression, Span)> {
 }
 
 fn _ref(s: Input) -> IResult<Input, (_Expression, Span)> {
-    map(
-        pair(separated!(right tag(REF)), Expression::parse),
-        |(ref_token, s)| {
-            (
-                _Expression::Refer(s.clone()),
-                Span::from_combination(ref_token.span(), s.location),
-            )
-        },
-    )(s)
+    map(pair(tag(AMPRSND), Expression::parse), |(ref_token, s)| {
+        (
+            _Expression::Refer(s.clone()),
+            Span::from_combination(ref_token.span(), s.location),
+        )
+    })(s)
 }
 
 fn _deref(s: Input) -> IResult<Input, (_Expression, Span)> {
-    map(
-        pair(separated!(right tag(REF)), Expression::parse),
-        |(ref_token, s)| {
-            (
-                _Expression::Refer(s.clone()),
-                Span::from_combination(ref_token.span(), s.location),
-            )
-        },
-    )(s)
+    map(pair(tag(STAR), Expression::parse), |(ref_token, s)| {
+        (
+            _Expression::Refer(s.clone()),
+            Span::from_combination(ref_token.span(), s.location),
+        )
+    })(s)
 }
 
 fn _unary(s: Input) -> IResult<Input, (_Expression, Span)> {
-    map(
-        pair(separated!(right Unary::parse), Expression::parse),
-        |(op, expr)| {
-            (
-                _Expression::Unary(op.clone(), expr.clone()),
-                Span::from_combination(op.location, expr.location),
-            )
-        },
-    )(s)
+    map(pair(Unary::parse, Expression::parse), |(op, expr)| {
+        (
+            _Expression::Unary(op.clone(), expr.clone()),
+            Span::from_combination(op.location, expr.location),
+        )
+    })(s)
 }
 
 #[recursive_parser]
@@ -227,10 +213,10 @@ fn _call(s: Input) -> IResult<Input, (_Expression, Span)> {
         tuple((
             Expression::parse,
             preceded(
-                separated!(right tag(OP_PAREN)),
-                separated_list0(separated!(both tag(COMMA)), Expression::parse),
+                tag(OP_PAREN),
+                separated_list0(tag(COMMA), Expression::parse),
             ),
-            separated!(left tag(CLS_PAREN)),
+            tag(CLS_PAREN),
         )),
         |(expr, to, last)| {
             (
@@ -247,10 +233,7 @@ fn _call(s: Input) -> IResult<Input, (_Expression, Span)> {
 #[recursive_parser]
 fn _field(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
-        pair(
-            Expression::parse,
-            preceded(separated!(both tag(DOT)), Identifier::parse),
-        ),
+        pair(Expression::parse, preceded(tag(DOT), Identifier::parse)),
         |(expr, to)| {
             (
                 _Expression::Field {
@@ -266,10 +249,7 @@ fn _field(s: Input) -> IResult<Input, (_Expression, Span)> {
 #[recursive_parser]
 fn _cast(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
-        pair(
-            Expression::parse,
-            preceded(separated!(both tag(AS)), Types::parse),
-        ),
+        pair(Expression::parse, preceded(tag(AS), Types::parse)),
         |(expr, to)| {
             (
                 _Expression::Cast {
@@ -287,8 +267,8 @@ fn _index(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         tuple((
             Expression::parse,
-            preceded(separated!(both tag(OP_SQ_BRACKET)), Expression::parse),
-            separated!(left tag(CLS_SQ_BRACKET)),
+            preceded(tag(OP_SQ_BRACKET), Expression::parse),
+            tag(CLS_SQ_BRACKET),
         )),
         |(expr, to, last)| {
             (
@@ -305,9 +285,9 @@ fn _index(s: Input) -> IResult<Input, (_Expression, Span)> {
 fn _array(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         tuple((
-            separated!(right tag(OP_SQ_BRACKET)),
-            separated_list1(separated!(both tag(COMMA)), Expression::parse),
-            separated!(left tag(CLS_SQ_BRACKET)),
+            tag(OP_SQ_BRACKET),
+            separated_list1(tag(COMMA), Expression::parse),
+            tag(CLS_SQ_BRACKET),
         )),
         |(start, s, last)| {
             (
@@ -321,9 +301,9 @@ fn _array(s: Input) -> IResult<Input, (_Expression, Span)> {
 fn _tuple(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         tuple((
-            separated!(right tag(OP_PAREN)),
-            separated_list1(separated!(both tag(COMMA)), Expression::parse),
-            separated!(left tag(CLS_PAREN)),
+            tag(OP_PAREN),
+            separated_list1(tag(COMMA), Expression::parse),
+            tag(CLS_PAREN),
         )),
         |(start, s, last)| {
             (
@@ -336,10 +316,7 @@ fn _tuple(s: Input) -> IResult<Input, (_Expression, Span)> {
 
 fn _assign(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
-        tuple((
-            terminated(Identifier::parse, separated!(both tag(ASSIGN))),
-            Expression::parse,
-        )),
+        tuple((terminated(Identifier::parse, tag(EQ)), Expression::parse)),
         |(name, value)| {
             (
                 _Expression::Assign {
@@ -355,12 +332,12 @@ fn _assign(s: Input) -> IResult<Input, (_Expression, Span)> {
 fn _func(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         tuple((
-            separated!(right tag(VERT_BAR)),
+            tag(VERT_BAR),
             alt((
-                map(tag(UNDER_SCORE), |_| None),
+                map(tag(UNDERLINE), |_| None),
                 map(Parameters::parse, |s| Some(s)),
             )),
-            preceded(separated!(both tag(VERT_BAR)), Closure::parse),
+            preceded(tag(VERT_BAR), Closure::parse),
         )),
         |(from, params, clsr)| {
             (
@@ -382,9 +359,9 @@ fn _cond(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         tuple((
             tag(IF),
-            separated!(both Expression::parse),
             Expression::parse,
-            opt(preceded(separated!(both tag(ELSE)), Expression::parse)),
+            Expression::parse,
+            opt(preceded(tag(ELSE), Expression::parse)),
         )),
         |(first, check, then, if_not)| {
             (
@@ -405,26 +382,23 @@ fn _cond(s: Input) -> IResult<Input, (_Expression, Span)> {
 }
 
 fn _loop(s: Input) -> IResult<Input, (_Expression, Span)> {
-    map(
-        tuple((tag(LOOP), separated!(left Expression::parse))),
-        |(first, repeat)| {
-            (
-                _Expression::Loop {
-                    repeat: repeat.clone(),
-                },
-                Span::from_combination(first.span(), repeat.location),
-            )
-        },
-    )(s)
+    map(tuple((tag(LOOP), Expression::parse)), |(first, repeat)| {
+        (
+            _Expression::Loop {
+                repeat: repeat.clone(),
+            },
+            Span::from_combination(first.span(), repeat.location),
+        )
+    })(s)
 }
 
 fn _for(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
         tuple((
             tag(FOR),
-            separated!(both Identifier::parse),
+            Identifier::parse,
             tag(IN),
-            separated!(both Expression::parse),
+            Expression::parse,
             Expression::parse,
         )),
         |(first, item, _, iterable, then)| {
@@ -442,11 +416,7 @@ fn _for(s: Input) -> IResult<Input, (_Expression, Span)> {
 
 fn _while(s: Input) -> IResult<Input, (_Expression, Span)> {
     map(
-        tuple((
-            tag(WHILE),
-            separated!(both Expression::parse),
-            Expression::parse,
-        )),
+        tuple((tag(WHILE), Expression::parse, Expression::parse)),
         |(first, check, repeat)| {
             (
                 _Expression::While {

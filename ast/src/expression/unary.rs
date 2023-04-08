@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{map_token, Input};
+use crate::{map_token, Input, Parsable};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -26,8 +26,8 @@ node_variant! { Unary { Negative, Negation }}
 impl Parsable<Input, (Self, Span)> for _Unary {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
-            map_token!(MINUS, Self::Negative),
-            map_token!(NEGATION, Self::Negation),
+            map_token!(LINE, Self::Negative),
+            map_token!(EXCLMTN, Self::Negation),
         ))(s)
     }
 }

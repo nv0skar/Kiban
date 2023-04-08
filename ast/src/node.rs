@@ -62,6 +62,10 @@ pub struct Node<T> {
     pub location: Span,
 }
 
+pub trait Parsable<T, A> {
+    fn parse(s: T) -> IResult<T, A>;
+}
+
 impl<T: Parsable<Input, (T, Span)>> Parsable<Input, Self> for Node<T> {
     fn parse(s: Input) -> IResult<Input, Self> {
         map(T::parse, |(s, span)| Node::new(SBox::new(s), span))(s)

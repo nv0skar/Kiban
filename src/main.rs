@@ -16,8 +16,7 @@
 
 #![allow(non_snake_case)]
 
-use kiban_ast::{closure::Closure, expression::Expression, statement::Statement};
-use kiban_commons::parser::Parsable;
+use kiban_ast::{expression::Expression, Parsable};
 use kiban_lexer::TokenStream;
 
 use std::{ffi::OsString, fs};
@@ -26,19 +25,18 @@ use clap::{Arg, ArgAction, ArgMatches, Command};
 use miette::Result;
 
 fn main() -> Result<()> {
-    // let lexed = TokenStream::parse("some_value = [banana.juice, potato.slice]", None)?;
-    // let lexed = TokenStream::parse("for item in hello::meaning return hello.0", None)?;
-    // let lexed = TokenStream::parse("for item in hello::meaning return hello.0", None)?;
-    // let lexed = TokenStream::parse("while cow::speaks return", None)?;
-    // let lexed = TokenStream::parse("if tomorrow_rains return error else return good", None)?;
-    // let lexed = TokenStream::parse("some_value.0 as Bool", None)?;
-    // let lexed = TokenStream::parse("some_array[some_value]", None)?;
-    // let lexed = TokenStream::parse("some_func(2.343, 2..3)", None)?;
-    // let lexed = TokenStream::parse("let hello: UInt32 = pot;", None)?;
-    // let lexed = TokenStream::parse("hello;", None)?;
-    // let lexed = TokenStream::parse("false as Fn(Bool) -> UInt32", None)?;
-    let lexed = TokenStream::parse("1 * 1 + 1", None)?;
-    println!("{}\n", lexed);
+    // let lexed = TokenStream::parse("some_value = [banana.juice, potato.slice]");
+    // let lexed = TokenStream::parse("for item in hello::meaning return hello.0");
+    // let lexed = TokenStream::parse("for item in hello::meaning return hello.0");
+    // let lexed = TokenStream::parse("while cow::speaks return");
+    // let lexed = TokenStream::parse("if tomorrow_rains return error else return good");
+    // let lexed = TokenStream::parse("some_value.0 as Bool");
+    // let lexed = TokenStream::parse("some_array[some_value]");
+    // let lexed = TokenStream::parse("some_func(2.343, 2..3)");
+    // let lexed = TokenStream::parse("let hello: UInt32 = pot;");
+    // let lexed = TokenStream::parse("hello;");
+    let lexed = TokenStream::parse("false as Fn(Bool) -> UInt32");
+    println!("{}", lexed);
     let parsed = Expression::parse(lexed.clone());
     println!("{:#?}", parsed);
     Ok(())

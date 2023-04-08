@@ -16,7 +16,7 @@
 
 use crate::{
     expression::{Expression, _Expression},
-    map_token, separated, Input,
+    Input, Parsable,
 };
 
 use kiban_commons::*;
@@ -26,7 +26,7 @@ use nom::IResult;
 use nom_recursive::recursive_parser;
 
 macro_rules! construct_binary {
-    ($(($token:path, $type_of:ident)),*) => {
+    ($(($token:tt, $type_of:ident)),*) => {
         paste::paste! {
             $(
                 #[recursive_parser]
@@ -34,7 +34,7 @@ macro_rules! construct_binary {
                     nom::combinator::map(
                         nom::sequence::tuple((
                             Expression::parse,
-                            separated!(both map_token!($token, _Binary::$type_of)),
+                            crate::map_token!($token, _Binary::$type_of),
                             Expression::parse,
                         )),
                         |(lhs, op, rhs)| {
@@ -61,6 +61,8 @@ node_variant! { Binary {
     Division,
     Exponentiation,
     Remainder,
+    LftShift,
+    RghtShift,
     Eq,
     NotEq,
     Greater,
@@ -74,18 +76,20 @@ node_variant! { Binary {
 
 construct_binary! {
     (PLUS, Addition),
-    (MINUS, Substraction),
-    (MUL_DEREF, Multiplication),
-    (DIV, Division),
-    (POW, Exponentiation),
-    (MOD, Remainder),
+    (LINE, Substraction),
+    (STAR, Multiplication),
+    (SLASH, Division),
+    ((STAR, STAR), Exponentiation),
+    (PERCENT, Remainder),
+    ((OP_CHEVRON, OP_CHEVRON), LftShift),
+    ((CLS_CHEVRON, CLS_CHEVRON), RghtShift),
     (EQ, Eq),
-    (N_EQ, NotEq),
-    (MORE_THAN, Greater),
-    (LESS_THAN, Less),
-    (MORE_EQ_THAN, GreaterEq),
-    (LESS_EQ_THAN, LessEq),
-    (AND, And),
-    (OR, Or),
-    (X_OR, XOr)
+    ((EXCLMTN, EQ), NotEq),
+    ((CLS_CHEVRON, EQ), GreaterEq),
+    ((OP_CHEVRON, EQ), LessEq),
+    (CLS_CHEVRON, Greater),
+    (OP_CHEVRON, Less),
+    ((AMPRSND, AMPRSND), And),
+    ((VERT_BAR, VERT_BAR), Or),
+    (CARET, XOr)
 }

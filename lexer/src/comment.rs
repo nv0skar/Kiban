@@ -14,23 +14,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Input, Parsable};
+use crate::{Input, Lexeme, Token};
 
+use kiban_commons::*;
+
+use compact_str::CompactString;
 use derive_more::Display;
-use nom::{
-    branch::alt,
-    bytes::complete::{tag, take_till, take_until},
-    character::is_newline,
-    combinator::map,
-    sequence::{delimited, preceded},
-    IResult,
-};
 
 #[derive(Clone, PartialEq, Display, Debug)]
 #[display(fmt = "\"{}\" ({})", content, typed)]
 pub struct Comment {
     pub typed: CommentType,
-    pub content: String,
+    pub content: CompactString,
 }
 
 #[derive(Clone, PartialEq, Display, Debug)]
@@ -44,28 +39,26 @@ pub enum CommentType {
     Multi,
 }
 
-impl<'a> Parsable<Input<'a>, Self> for Comment {
-    fn parse(s: Input) -> IResult<Input, Self> {
-        alt((_single, _multi))(s)
+impl Lexeme for Comment {
+    fn parse(s: &mut Input) -> Option<(Token, Span)> {
+        if let Some((content, span)) = s.consume_from("//") {
+            Some((
+                Token::Comment(Self {
+                    typed: CommentType::Single,
+                    content: content.get(2..).unwrap().into(),
+                }),
+                span,
+            ))
+        } else if let Some((content, span)) = s.consume_delimited("/*", "*/") {
+            Some((
+                Token::Comment(Self {
+                    typed: CommentType::Multi,
+                    content: content.get(2..content.len() - 2).unwrap().into(),
+                }),
+                span,
+            ))
+        } else {
+            None
+        }
     }
-}
-
-fn _single(s: Input) -> IResult<Input, Comment> {
-    map(
-        preceded(tag("//"), take_till(|c| is_newline(c as u8))),
-        |s: Input| Comment {
-            typed: CommentType::Single,
-            content: s.to_string(),
-        },
-    )(s)
-}
-
-fn _multi(s: Input) -> IResult<Input, Comment> {
-    map(
-        delimited(tag("/*"), take_until("*/"), tag("*/")),
-        |s: Input| Comment {
-            typed: CommentType::Multi,
-            content: s.to_string(),
-        },
-    )(s)
 }

@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{generic::Namespace, literal::Int, map_token_with_field, separated, Input};
+use crate::{generic::Namespace, literal::Int, Input, Parsable};
 
 use kiban_commons::*;
-use kiban_lexer::{Types as TypesToken, *};
+use kiban_lexer::*;
 
 use nom::{
     branch::alt,
@@ -33,6 +33,7 @@ node_variant! { Types {
     Boolean,
     Integer(NumberDef),
     Float(NumberDef),
+    Char,
     Array(SBox<Types>, Int),
     Tuple(SVec<Types>),
     Function {
@@ -45,22 +46,12 @@ impl Parsable<Input, (Self, Span)> for _Types {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
             map(Namespace::parse, |s| (Self::Name(s.clone()), s.location)),
-            map(tag(Token::Types(TypesToken::Bool)), |s: Input| {
-                (Self::Boolean, s.span())
-            }),
-            map_token_with_field!(Token::Types, TypesToken::Int, Self::Integer),
-            map_token_with_field!(Token::Types, TypesToken::Float, Self::Float),
+            map(tag(BOOL), |s: Input| (Self::Boolean, s.span())),
             map(
                 tuple((
-                    separated!(right tag(OP_SQ_BRACKET)),
-                    separated!(both pair(
-                        terminated(
-                            Types::parse,
-                            separated!(both tag(SEMICOLON))
-                        ),
-                        Int::parse
-                    )),
-                    separated!(left tag(CLS_SQ_BRACKET)),
+                    tag(OP_SQ_BRACKET),
+                    pair(terminated(Types::parse, tag(SEMICOLON)), Int::parse),
+                    tag(CLS_SQ_BRACKET),
                 )),
                 |(first, (types, size), last): (Input, (_, _), Input)| {
                     (
@@ -71,9 +62,9 @@ impl Parsable<Input, (Self, Span)> for _Types {
             ),
             map(
                 tuple((
-                    separated!(right tag(OP_PAREN)),
-                    separated_list1(separated!(both tag(COMMA)), Types::parse),
-                    separated!(left tag(CLS_PAREN)),
+                    tag(OP_PAREN),
+                    separated_list1(tag(COMMA), Types::parse),
+                    tag(CLS_PAREN),
                 )),
                 |(first, types, last): (Input, _, Input)| {
                     (
@@ -84,15 +75,12 @@ impl Parsable<Input, (Self, Span)> for _Types {
             ),
             map(
                 tuple((
-                    tag(Token::Types(TypesToken::Fn)),
+                    tag(FN_TY),
                     preceded(
-                        separated!(both tag(OP_PAREN)),
-                        pair(
-                            separated_list0(separated!(both tag(COMMA)), Types::parse),
-                            separated!(left tag(CLS_PAREN)),
-                        ),
+                        tag(OP_PAREN),
+                        pair(separated_list0(tag(COMMA), Types::parse), tag(CLS_PAREN)),
                     ),
-                    opt(preceded(separated!(both tag(RTRN_TY)), Types::parse)),
+                    opt(preceded(pair(tag(LINE), tag(CLS_CHEVRON)), Types::parse)),
                 )),
                 |(first, (params, last_sep), expect): (Input, (_, Input), Option<_>)| {
                     (

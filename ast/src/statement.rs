@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{expression::Expression, generic::Definition, separated, Input};
+use crate::{expression::Expression, generic::Definition, Input, Parsable};
 
 use kiban_commons::*;
 use kiban_lexer::*;
@@ -40,10 +40,7 @@ impl Parsable<Input, (Self, Span)> for _Statement {
     fn parse(s: Input) -> IResult<Input, (Self, Span)> {
         alt((
             map(
-                pair(
-                    alt((_declaration, _return)),
-                    separated!(left tag(SEMICOLON)),
-                ),
+                pair(alt((_declaration, _return)), tag(SEMICOLON)),
                 |((statement, statement_location), last)| {
                     (
                         statement,
@@ -52,7 +49,7 @@ impl Parsable<Input, (Self, Span)> for _Statement {
                 },
             ),
             map(
-                pair(Expression::parse, opt(separated!(left tag(SEMICOLON)))),
+                pair(Expression::parse, opt(tag(SEMICOLON))),
                 |(expr, semicolon)| {
                     if let Some(last) = semicolon {
                         (
@@ -71,9 +68,9 @@ impl Parsable<Input, (Self, Span)> for _Statement {
 fn _declaration(s: Input) -> IResult<Input, (_Statement, Span)> {
     map(
         tuple((
-            separated!(right tag(LET)),
+            tag(LET),
             Definition::parse,
-            opt(preceded(separated!(both tag(ASSIGN)), Expression::parse)),
+            opt(preceded(tag(EQ), Expression::parse)),
         )),
         |(first, definition, expression)| {
             (
@@ -98,7 +95,7 @@ fn _declaration(s: Input) -> IResult<Input, (_Statement, Span)> {
 
 fn _return(s: Input) -> IResult<Input, (_Statement, Span)> {
     map(
-        pair(tag(RETURN), separated!(left opt(Expression::parse))),
+        pair(tag(RETURN), opt(Expression::parse)),
         |(first, rtrn_value)| {
             (
                 _Statement::Return(rtrn_value.clone().map(|s| s)),
