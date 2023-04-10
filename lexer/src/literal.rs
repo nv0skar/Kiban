@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Input, Lexeme, Token};
+use crate::*;
 
 use kiban_commons::*;
 
@@ -40,9 +40,9 @@ pub enum Literal {
 
 impl Lexeme for Literal {
     fn parse(s: &mut Input) -> Option<(Token, Span)> {
-        if let Some(span) = s.consume_specific("true") {
+        if let Some(span) = s.consume_pattern("true") {
             Some((Token::Literal(Self::Bool(true)), span))
-        } else if let Some(span) = s.consume_specific("false") {
+        } else if let Some(span) = s.consume_pattern("false") {
             Some((Token::Literal(Self::Bool(false)), span))
         } else if let Some((content, span)) = s.consume_delimited("\'", "\'") {
             Some((
@@ -51,7 +51,7 @@ impl Lexeme for Literal {
             ))
         } else if let Some((content, span)) = s.consume_delimited("\"", "\"") {
             Some((Token::Literal(Self::String(content)), span))
-        } else if let Some(((is_decimal, number), span)) = s.consume_num() {
+        } else if let Some(((is_decimal, number), span)) = s.consume_number() {
             Some((
                 Token::Literal(if !is_decimal {
                     Self::Int(number.parse().unwrap())

@@ -15,11 +15,13 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod comment;
+pub mod input;
 pub mod keyword;
 pub mod literal;
 pub mod punctuation;
 
 pub use comment::*;
+pub use input::*;
 pub use keyword::*;
 pub use literal::*;
 pub use punctuation::*;
@@ -33,7 +35,7 @@ use std::{
     ops::{Range, RangeFrom, RangeFull, RangeTo},
 };
 
-use compact_str::{CompactString, ToCompactString};
+use compact_str::CompactString;
 use derive_more::{Constructor, Display};
 use nom::{
     Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, Needed, Offset, Slice,
@@ -45,10 +47,6 @@ use smallvec::SmallVec;
 pub trait Lexeme {
     fn parse(s: &mut Input) -> Option<(Token, Span)>;
 }
-
-/// input type for the lexer that keeps track of the string's offset relative to the source
-#[derive(Clone, Constructor, Default, Debug)]
-pub struct Input(usize, CompactString);
 
 /// token stream with recursive info
 #[derive(Clone, Constructor, Default, Debug)]
@@ -73,181 +71,6 @@ pub enum Token {
     Comment(Comment),
     #[display(fmt = "{} (unknown)", _0)]
     Unknown(char),
-}
-
-impl Input {
-    pub fn digest(self) -> SVec<Self> {
-        let input = self.1.escape_default().collect::<SVec<_>>();
-        let input_iter = input.iter().enumerate();
-        let (mut buffer, mut ctrl_flags): (SVec<Option<Input>>, [bool; 3]) =
-            (SVec::from_elem(None, 1), [bool::default(); 3]);
-        for (ch_offset, ch) in input_iter {
-            if ch.is_whitespace() && !ctrl_flags[0] && !ctrl_flags[1] && !ctrl_flags[2] {
-                buffer.push(None)
-            } else {
-                if ch_offset != 0 {
-                    if *ch == '"' && input[ch_offset - 1] != '\\' {
-                        ctrl_flags[0] ^= true;
-                    }
-                    if *ch == '/' && input[ch_offset - 1] == '/' {
-                        ctrl_flags[1] = true;
-                    }
-                    if *ch == 'n' && input[ch_offset - 1] == '\\' {
-                        ctrl_flags[1] = false;
-                    }
-                    if *ch == '*' && input[ch_offset - 1] == '/' {
-                        ctrl_flags[2] = true;
-                    }
-                    if *ch == '/' && input[ch_offset - 1] == '*' {
-                        ctrl_flags[2] = false;
-                    }
-                }
-                let last_elem = buffer.last_mut().unwrap();
-                if let Some(elem) = last_elem {
-                    elem.1.push(*ch)
-                } else {
-                    *last_elem = Some(Self(ch_offset, ch.to_compact_string()));
-                }
-            }
-        }
-        buffer.iter().filter_map(|s| s.clone()).collect()
-    }
-
-    pub fn tokenize(&mut self) -> _TokenStream {
-        let mut buffer: SVec<(Token, Span)> = SVec::new();
-        while self.can_consume() {
-            if let Some(kw) = Keyword::parse(self) {
-                buffer.push(kw);
-                continue;
-            } else if let Some(commnt) = Comment::parse(self) {
-                buffer.push(commnt);
-                continue;
-            } else if let Some(punc) = Punctuation::parse(self) {
-                buffer.push(punc);
-                continue;
-            } else if let Some(lit) = Literal::parse(self) {
-                buffer.push(lit);
-                continue;
-            } else if let Some((id, span)) = self.consume_ident() {
-                buffer.push((Token::Identifier(id), span));
-            } else {
-                let (any_char, span) = self.consume_any_char();
-                buffer.push((Token::Unknown(any_char), span));
-                continue;
-            }
-        }
-        buffer
-    }
-
-    fn take(&mut self, n: usize) {
-        assert!(n != 0, "Cannot take 0 characters from input!");
-        self.0 += n;
-        self.1 = self.1.get(n..).unwrap().into();
-    }
-
-    fn can_consume(&self) -> bool {
-        !self.1.is_empty()
-    }
-
-    pub fn consume_specific(&mut self, txt: &str) -> Option<Span> {
-        if let (offset, Some(to_cmp)) = (self.0, self.1.get(..txt.len())) {
-            if txt == to_cmp {
-                self.take(txt.len());
-                return Some(Span::new(offset, offset + txt.len() - 1));
-            }
-        }
-        None
-    }
-
-    pub fn consume_from(&mut self, txt: &str) -> Option<(CompactString, Span)> {
-        if let Some(to_cmp) = self.1.get(..txt.len()) {
-            if txt == to_cmp {
-                let rest = (self.1.clone(), Span::new(self.0, self.0 + self.1.len() - 1));
-                self.take(self.1.len());
-                return Some(rest);
-            }
-        }
-        None
-    }
-
-    pub fn consume_delimited(&mut self, from: &str, until: &str) -> Option<(CompactString, Span)> {
-        if let Some(to_cmp) = self.1.get(..from.len()) {
-            if from == to_cmp {
-                let input = self.1.chars().collect::<SVec<_>>();
-                let input_iter = input.iter().enumerate();
-                let mut buffer: SVec<char> = SVec::new();
-                for (ch_offset, ch) in input_iter {
-                    buffer.push(*ch);
-                    if ch_offset >= until.len() {
-                        if until
-                            == input
-                                .get(ch_offset - until.len() + 1..ch_offset + 1)
-                                .unwrap()
-                                .iter()
-                                .collect::<CompactString>()
-                        {
-                            let delimited = (
-                                buffer.iter().collect::<CompactString>(),
-                                Span::new(self.0, self.0 + buffer.len() - 1),
-                            );
-                            self.take(buffer.len());
-                            return Some(delimited);
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    pub fn consume_num(&mut self) -> Option<((bool, CompactString), Span)> {
-        let (mut is_decimal, mut buffer) = (bool::default(), CompactString::default());
-        for ch in self.1.escape_default() {
-            if ch.is_numeric() {
-                buffer.push(ch);
-            } else if ch == '.' {
-                if is_decimal {
-                    return None;
-                }
-                is_decimal = true;
-                buffer.push(ch)
-            } else {
-                break;
-            }
-        }
-        if !buffer.is_empty() {
-            let number_span = Span::new(self.0, self.0 + buffer.len() - 1);
-            self.take(buffer.len());
-            Some(((is_decimal, buffer), number_span))
-        } else {
-            None
-        }
-    }
-
-    pub fn consume_ident(&mut self) -> Option<(CompactString, Span)> {
-        let first_char = self.1.escape_default().next().unwrap();
-        if !first_char.is_digit(10) && !first_char.is_whitespace() {
-            let mut buffer: SVec<char> = SVec::new();
-            for ch in self.1.escape_default() {
-                if ch.is_alphanumeric() || ch == '_' {
-                    buffer.push(ch)
-                } else {
-                    break;
-                }
-            }
-            let span_res = Span::new(self.0, self.0 + buffer.len() - 1);
-            self.take(buffer.len());
-            Some((buffer.iter().collect(), span_res))
-        } else {
-            None
-        }
-    }
-
-    pub fn consume_any_char(&mut self) -> (char, Span) {
-        let (offset, any_char) = (self.0, self.1.chars().next().unwrap());
-        self.take(1);
-        (any_char, Span::new(offset, offset + 1))
-    }
 }
 
 impl TokenStream {
@@ -452,12 +275,6 @@ impl InputLength for Token {
     #[inline]
     fn input_len(&self) -> usize {
         1
-    }
-}
-
-impl From<&str> for Input {
-    fn from(value: &str) -> Self {
-        Self(0, value.into())
     }
 }
 

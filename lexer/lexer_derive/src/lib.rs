@@ -52,7 +52,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
             );
             parser_alts.extend(
                 TokenStream::from(quote! {
-                    if let Some(span) = s.consume_specific(#token) {
+                    if let Some(span) = s.consume_pattern(#token) {
                         return Some((crate::Token::#ident(Self::#field), span));
                     }
                 })
