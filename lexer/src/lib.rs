@@ -35,13 +35,15 @@ use std::{
     ops::{Range, RangeFrom, RangeFull, RangeTo},
 };
 
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+
 use compact_str::CompactString;
 use derive_more::{Constructor, Display};
 use nom::{
     Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, Needed, Offset, Slice,
 };
 use nom_recursive::{HasRecursiveInfo, HasRecursiveType, RecursiveInfo};
-use rayon::prelude::*;
 use smallvec::SmallVec;
 
 pub trait Lexeme {
@@ -76,13 +78,27 @@ pub enum Token {
 impl TokenStream {
     pub fn parse(input: &str) -> Self {
         Self(
-            Input::from(input)
-                .digest()
-                .par_iter()
-                .map(|s| s.clone().tokenize().to_vec())
-                .flatten()
-                .collect::<Vec<(Token, Span)>>()
-                .into(),
+            {
+                #[cfg(feature = "parallel")]
+                {
+                    Input::from(input)
+                        .prepare()
+                        .par_iter()
+                        .map(|s| s.clone().tokenize().to_vec())
+                        .flatten()
+                        .collect::<Vec<(Token, Span)>>()
+                        .into()
+                }
+                #[cfg(not(feature = "parallel"))]
+                {
+                    Input::from(input)
+                        .prepare()
+                        .iter()
+                        .map(|s| s.clone().tokenize())
+                        .flatten()
+                        .collect::<SVec<(Token, Span)>>()
+                }
+            },
             None,
         )
     }
@@ -110,10 +126,13 @@ impl HasRecursiveType<_TokenStream> for TokenStream {
 
 impl Spanned for TokenStream {
     fn span(&self) -> Span {
-        if let (Some(first), Some(last)) = (self.0.first(), self.0.last()) {
-            Span::new(*first.1.start(), *last.1.end())
+        if let (Some(start), Some(end)) = (self.0.first(), self.0.last()) {
+            Span::new(
+                *start.1.offset(),
+                (end.1.offset() + end.1.length()) - start.1.offset(),
+            )
         } else {
-            Span::default()
+            panic!("There is token stream to calculate span!")
         }
     }
 }
@@ -291,12 +310,6 @@ impl From<TokenStream> for Token {
         } else {
             panic!("Token streams with no or more than one token cannot be converted into tokens!")
         }
-    }
-}
-
-impl From<Token> for TokenStream {
-    fn from(value: Token) -> Self {
-        Self(SmallVec::from(vec![(value, Span::default())]), None)
     }
 }
 

@@ -4,6 +4,10 @@ description = "Kiban's lexer 🪨"
 version = "0.0.1"
 edition = "2021"
 
+[features]
+default = ["parallel"]
+parallel = []
+
 [dependencies]
 kiban_commons = { path = "../commons" }
 kiban_error = { path = "../error" }

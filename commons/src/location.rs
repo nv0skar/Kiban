@@ -14,16 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use derive_more::{Constructor, Display};
 use getset::Getters;
 use miette::SourceSpan;
 
 #[derive(Clone, PartialEq, Constructor, Getters, Display, Debug)]
-#[display(fmt = "{}..{}", start, end)]
+#[display(fmt = "{}..+{}", offset, length)]
 #[get = "pub"]
+
 pub struct Span {
-    start: usize,
-    end: usize,
+    offset: usize,
+    length: usize,
 }
 
 pub trait Spanned {
@@ -31,29 +34,17 @@ pub trait Spanned {
 }
 
 impl Span {
-    pub fn from_offset(offset: usize, length: usize) -> Self {
-        Self {
-            start: offset,
-            end: offset + length,
-        }
+    pub fn location(&self) -> Range<usize> {
+        self.offset..(self.offset + self.length)
     }
 
-    pub fn from_combination(start: Span, end: Span) -> Span {
-        Span::new(*start.start(), *end.end())
+    pub fn from_combination(start: Self, end: Self) -> Self {
+        Self::new(start.offset, (end.offset + end.length) - start.offset)
     }
 }
 
 impl Into<SourceSpan> for Span {
     fn into(self) -> SourceSpan {
-        SourceSpan::new(self.start.into(), (self.end - self.start).into())
-    }
-}
-
-impl Default for Span {
-    fn default() -> Self {
-        Self {
-            start: Default::default(),
-            end: Default::default(),
-        }
+        SourceSpan::new(self.offset.into(), self.length.into())
     }
 }

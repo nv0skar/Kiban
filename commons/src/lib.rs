@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod span;
+pub mod location;
 pub mod types;
 
-pub use span::*;
+pub use location::*;
 pub use types::*;
 
 use smallbox::{space::S16, SmallBox};

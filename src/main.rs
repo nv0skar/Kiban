@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     // let lexed = TokenStream::parse("some_func(2.343, 2..3)");
     // let lexed = TokenStream::parse("let hello: UInt32 = pot;");
     // let lexed = TokenStream::parse("hello;");
-    let lexed = TokenStream::parse("false as Fn(Bool) -> UInt32");
+    let lexed = TokenStream::parse("false as Fn()");
     println!("{}", lexed);
     let parsed = Expression::parse(lexed.clone());
     println!("{:#?}", parsed);
