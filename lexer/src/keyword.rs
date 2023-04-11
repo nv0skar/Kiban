@@ -20,75 +20,75 @@ use derive_more::Display;
 
 #[derive(Clone, PartialEq, TokenParser, Display, Debug)]
 pub enum Keyword {
-    /// public declaration
+    /// Public declaration
     #[token = "pub"]
     Pub,
 
-    /// imports declaration
+    /// Imports declaration
     #[token = "use"]
     Use,
 
-    /// constant declaration
+    /// Constant declaration
     #[token = "const"]
     Const,
 
-    /// type declaration
+    /// Type declaration
     #[token = "type"]
     Type,
 
-    /// function declaration
+    /// Function declaration
     #[token = "fn"]
     Fn,
 
-    /// value declaration
+    /// Value declaration
     #[token = "let"]
     Let,
 
-    /// type casting
+    /// Type casting
     #[token = "as"]
     As,
 
-    /// loops
+    /// Loops
     #[token = "loop"]
     Loop,
 
-    /// while
+    /// While
     #[token = "while"]
     While,
 
-    /// conditional
+    /// Conditional
     #[token = "if"]
     If,
 
-    /// condition not meeted
+    /// Condition not meeted
     #[token = "else"]
     Else,
 
-    /// element name of a single inner value of iterable
+    /// Element name of a single inner value of iterable
     #[token = "for"]
     For,
 
-    /// iterable
+    /// Iterable
     #[token = "in"]
     In,
 
-    /// skip to next element in iterable
+    /// Skip to next element in iterable
     #[token = "continue"]
     Continue,
 
-    /// interrupt iterable
+    /// Interrupt iterable
     #[token = "break"]
     Break,
 
-    /// bool type
+    /// Bool type
     #[token = "bool"]
     Bool,
 
-    /// fn type
+    /// Fn type
     #[token = "Fn"]
     FnTy,
 
-    /// return from a function
+    /// Return from a function
     #[token = "return"]
     Return,
 }

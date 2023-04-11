@@ -34,13 +34,13 @@ pub enum CommentType {
     #[display(fmt = "single-lined")]
     Single,
 
-    /// Multi lined comments are those that are delimited at the beginning by '/*' and by '*/' at the end
-    #[display(fmt = "multi-lined")]
-    Multi,
+    /// Delimited comments are those that are delimited at the beginning by '/*' and by '*/' at the end
+    #[display(fmt = "delimited")]
+    Delimited,
 }
 
 impl Lexeme for Comment {
-    fn parse(s: &mut Input) -> Option<(Token, Span)> {
+    fn parse(s: &mut Fragment) -> Option<(Token, Span)> {
         if let Some((content, span)) = s.consume_from("//") {
             Some((
                 Token::Comment(Self {
@@ -49,10 +49,10 @@ impl Lexeme for Comment {
                 }),
                 span,
             ))
-        } else if let Some((content, span)) = s.consume_delimited("/*", "*/") {
+        } else if let Some((content, span)) = s.consume_from("/*") {
             Some((
                 Token::Comment(Self {
-                    typed: CommentType::Multi,
+                    typed: CommentType::Delimited,
                     content: content.get(2..content.len() - 2).unwrap().into(),
                 }),
                 span,

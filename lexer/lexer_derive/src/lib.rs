@@ -65,7 +65,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let output = quote! {
         #element_refs
         impl crate::Lexeme for #ident {
-            fn parse(s: &mut crate::Input) -> Option<(crate::Token, kiban_commons::Span)> {
+            fn parse(s: &mut crate::Fragment) -> Option<(crate::Token, kiban_commons::Span)> {
                 #parser_alts
                 None
             }

@@ -58,7 +58,7 @@ macro_rules! node_variant {
 
 #[derive(Clone, PartialEq, Constructor, Debug)]
 pub struct Node<T> {
-    pub inner: kiban_commons::SBox<T>,
+    pub inner: SBox<T>,
     pub location: Span,
 }
 

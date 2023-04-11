@@ -16,7 +16,7 @@
 
 use kiban_ast::Tree;
 use kiban_error::{Error, Kinds};
-use kiban_lexer::TokenStream;
+use kiban_lexer::{Input, TokenStream};
 
 use std::{fs, path::PathBuf};
 
@@ -60,7 +60,7 @@ impl<'a> Module<'a> {
     }
 
     pub fn set_source(&mut self, source: &'a str) -> Result<(), Error> {
-        let _lexis = TokenStream::parse(source);
+        let _lexis = Input::new(source).tokenize();
         todo!()
     }
 }
@@ -75,7 +75,7 @@ impl<'a> TryFrom<PathBuf> for Module<'a> {
             location: None,
             error: Kinds::FSError,
         })?;
-        let _lexis = TokenStream::parse(&source);
+        let _lexis = Input::new(&source).tokenize();
         todo!()
     }
 }

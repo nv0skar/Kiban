@@ -35,9 +35,6 @@ use std::{
     ops::{Range, RangeFrom, RangeFull, RangeTo},
 };
 
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
-
 use compact_str::CompactString;
 use derive_more::{Constructor, Display};
 use nom::{
@@ -46,18 +43,14 @@ use nom::{
 use nom_recursive::{HasRecursiveInfo, HasRecursiveType, RecursiveInfo};
 use smallvec::SmallVec;
 
-pub trait Lexeme {
-    fn parse(s: &mut Input) -> Option<(Token, Span)>;
-}
-
-/// token stream with recursive info
+/// Token stream with recursive info
 #[derive(Clone, Constructor, Default, Debug)]
 pub struct TokenStream(_TokenStream, Option<RecursiveInfo<_TokenStream>>);
 
-/// token stream
+/// Token stream
 type _TokenStream = SVec<(Token, Span)>;
 
-/// token variants
+/// Token variants
 #[derive(Clone, PartialEq, Display, Debug)]
 #[display(fmt = "{}")]
 pub enum Token {
@@ -73,35 +66,6 @@ pub enum Token {
     Comment(Comment),
     #[display(fmt = "{} (unknown)", _0)]
     Unknown(char),
-}
-
-impl TokenStream {
-    pub fn parse(input: &str) -> Self {
-        Self(
-            {
-                #[cfg(feature = "parallel")]
-                {
-                    Input::from(input)
-                        .prepare()
-                        .par_iter()
-                        .map(|s| s.clone().tokenize().to_vec())
-                        .flatten()
-                        .collect::<Vec<(Token, Span)>>()
-                        .into()
-                }
-                #[cfg(not(feature = "parallel"))]
-                {
-                    Input::from(input)
-                        .prepare()
-                        .iter()
-                        .map(|s| s.clone().tokenize())
-                        .flatten()
-                        .collect::<SVec<(Token, Span)>>()
-                }
-            },
-            None,
-        )
-    }
 }
 
 impl HasRecursiveInfo<_TokenStream> for TokenStream {
