@@ -20,8 +20,8 @@ use crate::*;
 use rayon::prelude::*;
 
 /// Trait for parsable tokens
-pub trait Lexeme {
-    fn parse(s: &mut Fragment) -> Option<Token>;
+pub trait Lexeme<'i> {
+    fn parse(s: &mut Fragment) -> Option<Token<'i>>;
 }
 
 /// Input type for the lexer that keeps track of the string's offset relative to the source
@@ -58,14 +58,14 @@ impl<'i> Input<'i> {
         Input::defragment(input)
     }
 
-    pub fn tokenize(&self) -> TokenStream {
+    pub fn tokenize(&mut self) -> TokenStream {
         TokenStream(
             {
                 #[cfg(feature = "parallel")]
                 {
                     self.0
-                        .par_iter()
-                        .map(|s| s.clone().digest().to_vec())
+                        .par_iter_mut()
+                        .map(|s| s.digest().to_vec())
                         .flatten()
                         .collect::<Vec<Token>>()
                         .into()
@@ -73,10 +73,10 @@ impl<'i> Input<'i> {
                 #[cfg(not(feature = "parallel"))]
                 {
                     self.0
-                        .iter()
-                        .map(|s| s.clone().digest())
+                        .iter_mut()
+                        .map(|s| s.digest())
                         .flatten()
-                        .collect::<SVec<Token>>()
+                        .collect::<SVec<Token<'i>>>()
                 }
             },
             Option::default(),
@@ -136,7 +136,9 @@ impl DefragTracker {
                     self.lit_char = false;
                     return DefragResult::PushAndDefrag;
                 } else {
-                    self.lit_char = true;
+                    if !self.lit_string {
+                        self.lit_char = true;
+                    }
                 }
             }
             [_, '\"'] => {
@@ -144,7 +146,9 @@ impl DefragTracker {
                     self.lit_string = false;
                     return DefragResult::PushAndDefrag;
                 } else {
-                    self.lit_string = true;
+                    if !self.lit_char {
+                        self.lit_string = true;
+                    }
                 }
             }
             _ if ch == '\n' => {
@@ -268,17 +272,33 @@ impl<'i> Fragment<'i> {
             if let Some(kw) = Keyword::parse(self) {
                 buffer.push(kw);
                 continue;
-            } else if let Some(commnt) = Comment::parse(self) {
-                buffer.push(commnt);
+            } else if let Some((content, span)) = self.consume_from("//") {
+                buffer.push(Token::new(
+                    TokenKind::Comment(CommentKind::Line, &content[2..]),
+                    span,
+                ));
                 continue;
+            } else if let Some((content, span)) = self.consume_from("/*") {
+                buffer.push(Token::new(
+                    TokenKind::Comment(CommentKind::Block, &content[2..content.len() - 2]),
+                    span,
+                ));
+                continue;
+            } else if let Some((content, span)) = self.consume_from("\'") {
+                buffer.push(Token::new(TokenKind::CharLit(&content[1..2]), span))
+            } else if let Some((content, span)) = self.consume_from("\"") {
+                buffer.push(Token::new(
+                    TokenKind::StrLit(&content[1..content.len() - 1]),
+                    span,
+                ))
             } else if let Some(punc) = Punctuation::parse(self) {
                 buffer.push(punc);
                 continue;
-            } else if let Some(lit) = Literal::parse(self) {
+            } else if let Some(lit) = ProcLit::parse(self) {
                 buffer.push(lit);
                 continue;
             } else if let Some((id, span)) = self.consume_id() {
-                buffer.push(Token::new(TokenKind::Identifier(id.into()), span));
+                buffer.push(Token::new(TokenKind::Identifier(id), span));
             } else {
                 let (any_char, span) = self.consume_any();
                 buffer.push(Token::new(TokenKind::Unknown(any_char), span));

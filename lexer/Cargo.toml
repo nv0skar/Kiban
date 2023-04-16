@@ -14,7 +14,6 @@ kiban_error = { path = "../error" }
 kiban_lexer_derive = { path = "./lexer_derive" }
 rayon = "1.7"
 smallvec = "1.10"
-arrayvec = "0.7"
 compact_str = "0.7"
 derive_more = "0.99"
 getset = "0.1"

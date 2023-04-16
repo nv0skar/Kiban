@@ -39,7 +39,7 @@ node! {
             lhs: Expr,
             rhs: Expr,
         },
-        Literal(Literal),
+        Literal(ProcLit),
         Struct(Path, StructTy),
         Block(Block),
         Array(SVec<Expr>),

@@ -24,8 +24,9 @@ use clap::{Arg, ArgAction, ArgMatches, Command};
 use miette::Result;
 
 fn main() -> Result<()> {
-    let lexed = Input::from("some_value = banana.juice").tokenize();
-    println!("{}", lexed);
+    let mut input =
+        Input::from("some_val = orange.juice; other_val = \"I like orange juice!\" // Hello!");
+    println!("{}", input.tokenize());
     // let parsed = Expression::parse(lexed.clone());
     // println!("{:#?}", parsed);
     Ok(())

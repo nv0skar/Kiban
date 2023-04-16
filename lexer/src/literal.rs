@@ -20,39 +20,24 @@ use std::mem::discriminant;
 
 /// Tokens that store a literal
 #[derive(Copy, Clone, Display, Debug)]
-pub enum Literal {
+pub enum ProcLit {
+    #[display(fmt = "{} (bool)", _0)]
     Bool(bool),
     #[display(fmt = "{} (integer)", _0)]
     Int(usize),
     #[display(fmt = "{} (float)", _0)]
     Float(f32),
-    #[display(fmt = "{:?} (char)", _0)]
-    Char(char),
-    #[display(fmt = "{:?} (str)", _0)]
-    Str(ArrayString<1024>),
 }
 
-impl Lexeme for Literal {
-    fn parse(s: &mut Fragment) -> Option<Token> {
+impl<'i> Lexeme<'i> for ProcLit {
+    fn parse(s: &mut Fragment) -> Option<Token<'i>> {
         if let Some(span) = s.consume_pattern("true") {
-            Some(Token::new(TokenKind::Literal(Self::Bool(true)), span))
+            Some(Token::new(TokenKind::ProcLit(Self::Bool(true)), span))
         } else if let Some(span) = s.consume_pattern("false") {
-            Some(Token::new(TokenKind::Literal(Self::Bool(false)), span))
-        } else if let Some((content, span)) = s.consume_from("\'") {
-            Some(Token::new(
-                TokenKind::Literal(Self::Char(content.chars().collect::<SVec<_>>()[1])),
-                span,
-            ))
-        } else if let Some((content, span)) = s.consume_from("\"") {
-            Some(Token::new(
-                TokenKind::Literal(Self::Str(
-                    ArrayString::from(&content[1..content.len() - 1]).unwrap(),
-                )),
-                span,
-            ))
+            Some(Token::new(TokenKind::ProcLit(Self::Bool(false)), span))
         } else if let Some(((is_decimal, number), span)) = s.consume_number() {
             Some(Token::new(
-                TokenKind::Literal(if !is_decimal {
+                TokenKind::ProcLit(if !is_decimal {
                     Self::Int(number.parse().unwrap())
                 } else {
                     Self::Float(number.parse().unwrap())
@@ -65,20 +50,18 @@ impl Lexeme for Literal {
     }
 }
 
-impl PartialEq for Literal {
+impl PartialEq for ProcLit {
     fn eq(&self, other: &Self) -> bool {
         discriminant(self) == discriminant(other)
     }
 }
 
-impl TokenOrigin for Literal {
+impl TokenOrigin for ProcLit {
     fn origin(&self) -> Option<CompactString> {
         Some(match self {
-            Literal::Bool(bool) => bool.to_compact_string(),
-            Literal::Int(int) => int.to_compact_string(),
-            Literal::Float(float) => float.to_compact_string(),
-            Literal::Char(ch) => ch.to_compact_string(),
-            Literal::Str(str) => str.to_compact_string(),
+            ProcLit::Bool(bool) => bool.to_compact_string(),
+            ProcLit::Int(int) => int.to_compact_string(),
+            ProcLit::Float(float) => float.to_compact_string(),
         })
     }
 }

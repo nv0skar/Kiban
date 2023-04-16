@@ -32,7 +32,6 @@ use kiban_lexer_derive::TokenParser;
 use core::panic;
 use std::{fmt::Display, mem::discriminant};
 
-use arrayvec::ArrayString;
 use compact_str::{CompactString, ToCompactString};
 use derive_more::{Constructor, Display};
 use smallvec::SmallVec;
@@ -43,34 +42,38 @@ pub trait TokenOrigin {
 
 /// Token stream with recursive info
 #[derive(Clone, Constructor, Default, Debug)]
-pub struct TokenStream(SVec<Token>, Option<usize>);
+pub struct TokenStream<'i>(SVec<Token<'i>>, Option<usize>);
 
 /// Localised token
 #[derive(Clone, Constructor, PartialEq, Debug)]
-pub struct Token {
-    kind: TokenKind,
+pub struct Token<'i> {
+    kind: TokenKind<'i>,
     location: Span,
 }
 
 /// Token kinds
-#[derive(Clone, PartialEq, Display, Debug)]
+#[derive(Copy, Clone, PartialEq, Display, Debug)]
 #[display(fmt = "{}")]
-pub enum TokenKind {
+pub enum TokenKind<'i> {
     #[display(fmt = "{} (id)", _0)]
-    Identifier(CompactString),
+    Identifier(&'i str),
     #[display(fmt = "{} (kw)", _0)]
     Keyword(Keyword),
     #[display(fmt = "{} (punct)", _0)]
     Punctuation(Punctuation),
-    #[display(fmt = "{} (lit)", _0)]
-    Literal(Literal),
-    #[display(fmt = "{} (comment)", _0)]
-    Comment(Comment),
+    #[display(fmt = "{} (proc lit)", _0)]
+    ProcLit(ProcLit),
+    #[display(fmt = "{} (char lit)", _0)]
+    CharLit(&'i str),
+    #[display(fmt = "{} (str lit)", _0)]
+    StrLit(&'i str),
+    #[display(fmt = "\"{}\" ({} comment)", _1, _0)]
+    Comment(CommentKind, &'i str),
     #[display(fmt = "{} (unknown)", _0)]
     Unknown(char),
 }
 
-impl Spanned for TokenStream {
+impl Spanned for TokenStream<'_> {
     fn span(&self) -> Span {
         if let (Some(start), Some(end)) = (self.0.first(), self.0.last()) {
             Span::new(
@@ -83,7 +86,7 @@ impl Spanned for TokenStream {
     }
 }
 
-impl PartialEq for TokenStream {
+impl PartialEq for TokenStream<'_> {
     fn eq(&self, other: &Self) -> bool {
         if let (Some(info_self), Some(info_other)) = (self.1.clone(), other.1.clone()) {
             info_self == info_other && self.0 == other.0
@@ -93,7 +96,7 @@ impl PartialEq for TokenStream {
     }
 }
 
-impl PartialEq<Token> for TokenStream {
+impl<'i> PartialEq<Token<'i>> for TokenStream<'i> {
     fn eq(&self, t: &Token) -> bool {
         if let Some(Token { kind: token, .. }) = self.0.first() {
             return ((discriminant(token) == discriminant(&t.kind)) && {
@@ -108,8 +111,8 @@ impl PartialEq<Token> for TokenStream {
     }
 }
 
-impl Iterator for TokenStream {
-    type Item = Token;
+impl<'i> Iterator for TokenStream<'i> {
+    type Item = Token<'i>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.0.first().cloned();
@@ -120,14 +123,14 @@ impl Iterator for TokenStream {
     }
 }
 
-impl Into<TokenStream> for Token {
-    fn into(self) -> TokenStream {
+impl<'i> Into<TokenStream<'i>> for Token<'i> {
+    fn into(self) -> TokenStream<'i> {
         TokenStream(SmallVec::from(vec![self]), None)
     }
 }
 
-impl From<TokenStream> for Token {
-    fn from(value: TokenStream) -> Self {
+impl<'i> From<TokenStream<'i>> for Token<'i> {
+    fn from(value: TokenStream<'i>) -> Self {
         if value.0.len() == 1 {
             value.0.first().unwrap().clone()
         } else {
@@ -136,20 +139,22 @@ impl From<TokenStream> for Token {
     }
 }
 
-impl TokenOrigin for TokenKind {
+impl<'i> TokenOrigin for TokenKind<'i> {
     fn origin(&self) -> Option<CompactString> {
         match self {
             Self::Identifier(ident) => Some(ident.to_compact_string()),
             Self::Keyword(kw) => kw.origin(),
             Self::Punctuation(punc) => punc.origin(),
-            Self::Literal(lit) => lit.origin(),
-            Self::Comment(_) => None,
+            Self::ProcLit(lit) => lit.origin(),
+            Self::CharLit(ch) => Some(ch.to_compact_string()),
+            Self::StrLit(str) => Some(str.to_compact_string()),
+            Self::Comment(..) => None,
             Self::Unknown(unknown) => Some(unknown.to_compact_string()),
         }
     }
 }
 
-impl Display for TokenStream {
+impl<'i> Display for TokenStream<'i> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

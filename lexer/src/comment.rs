@@ -17,14 +17,7 @@
 use crate::*;
 
 #[derive(Copy, Clone, PartialEq, Display, Debug)]
-#[display(fmt = "\"{}\" ({})", content, typed)]
-pub struct Comment {
-    pub typed: CommentType,
-    pub content: ArrayString<1024>,
-}
-
-#[derive(Copy, Clone, PartialEq, Display, Debug)]
-pub enum CommentType {
+pub enum CommentKind {
     /// Lined comments are those that has '//' at the beginning, they finish with a line break
     #[display(fmt = "line")]
     Line,
@@ -32,28 +25,4 @@ pub enum CommentType {
     /// Block comments are those that are delimited at the beginning by '/*' and by '*/' at the end, so they can be multi-lined
     #[display(fmt = "block")]
     Block,
-}
-
-impl Lexeme for Comment {
-    fn parse(s: &mut Fragment) -> Option<Token> {
-        if let Some((content, span)) = s.consume_from("//") {
-            Some(Token::new(
-                TokenKind::Comment(Self {
-                    typed: CommentType::Line,
-                    content: ArrayString::from(content.get(2..).unwrap()).unwrap(),
-                }),
-                span,
-            ))
-        } else if let Some((content, span)) = s.consume_from("/*") {
-            Some(Token::new(
-                TokenKind::Comment(Self {
-                    typed: CommentType::Block,
-                    content: ArrayString::from(content.get(2..content.len() - 2).unwrap()).unwrap(),
-                }),
-                span,
-            ))
-        } else {
-            None
-        }
-    }
 }
