@@ -16,6 +16,13 @@
 
 use crate::*;
 
+#[derive(Copy, Clone, Constructor, PartialEq, Display, Debug)]
+#[display(fmt = "\"{}\" ({} comment)", content, typed)]
+pub struct Comment<'i> {
+    pub typed: CommentKind,
+    pub content: &'i str,
+}
+
 #[derive(Copy, Clone, PartialEq, Display, Debug)]
 pub enum CommentKind {
     /// Lined comments are those that has '//' at the beginning, they finish with a line break

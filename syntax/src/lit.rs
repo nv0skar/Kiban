@@ -18,7 +18,7 @@ use crate::*;
 
 node! {
     #[doc = "Define kind of literals"]
-    case Literal {
+    case Lit {
         Bool(bool),
         Int(usize),
         Float(usize),

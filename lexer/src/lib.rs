@@ -61,14 +61,10 @@ pub enum TokenKind<'i> {
     Keyword(Keyword),
     #[display(fmt = "{} (punct)", _0)]
     Punctuation(Punctuation),
-    #[display(fmt = "{} (proc lit)", _0)]
-    ProcLit(ProcLit),
-    #[display(fmt = "{} (char lit)", _0)]
-    CharLit(&'i str),
-    #[display(fmt = "{} (str lit)", _0)]
-    StrLit(&'i str),
-    #[display(fmt = "\"{}\" ({} comment)", _1, _0)]
-    Comment(CommentKind, &'i str),
+    #[display(fmt = "{} (lit)", _0)]
+    Literal(Literal<'i>),
+    #[display(fmt = "{}", _0)]
+    Comment(Comment<'i>),
     #[display(fmt = "{} (unknown)", _0)]
     Unknown(char),
 }
@@ -145,9 +141,7 @@ impl<'i> TokenOrigin for TokenKind<'i> {
             Self::Identifier(ident) => Some(ident.to_compact_string()),
             Self::Keyword(kw) => kw.origin(),
             Self::Punctuation(punc) => punc.origin(),
-            Self::ProcLit(lit) => lit.origin(),
-            Self::CharLit(ch) => Some(ch.to_compact_string()),
-            Self::StrLit(str) => Some(str.to_compact_string()),
+            Self::Literal(lit) => lit.origin(),
             Self::Comment(..) => None,
             Self::Unknown(unknown) => Some(unknown.to_compact_string()),
         }

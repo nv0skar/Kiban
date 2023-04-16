@@ -20,24 +20,28 @@ use std::mem::discriminant;
 
 /// Tokens that store a literal
 #[derive(Copy, Clone, Display, Debug)]
-pub enum ProcLit {
+pub enum Literal<'i> {
     #[display(fmt = "{} (bool)", _0)]
     Bool(bool),
     #[display(fmt = "{} (integer)", _0)]
     Int(usize),
     #[display(fmt = "{} (float)", _0)]
     Float(f32),
+    #[display(fmt = "{} (char)", _0)]
+    Char(&'i str),
+    #[display(fmt = "{} (str)", _0)]
+    Str(&'i str),
 }
 
-impl<'i> Lexeme<'i> for ProcLit {
+impl<'i> Lexeme<'i> for Literal<'i> {
     fn parse(s: &mut Fragment) -> Option<Token<'i>> {
         if let Some(span) = s.consume_pattern("true") {
-            Some(Token::new(TokenKind::ProcLit(Self::Bool(true)), span))
+            Some(Token::new(TokenKind::Literal(Self::Bool(true)), span))
         } else if let Some(span) = s.consume_pattern("false") {
-            Some(Token::new(TokenKind::ProcLit(Self::Bool(false)), span))
+            Some(Token::new(TokenKind::Literal(Self::Bool(false)), span))
         } else if let Some(((is_decimal, number), span)) = s.consume_number() {
             Some(Token::new(
-                TokenKind::ProcLit(if !is_decimal {
+                TokenKind::Literal(if !is_decimal {
                     Self::Int(number.parse().unwrap())
                 } else {
                     Self::Float(number.parse().unwrap())
@@ -50,18 +54,20 @@ impl<'i> Lexeme<'i> for ProcLit {
     }
 }
 
-impl PartialEq for ProcLit {
+impl PartialEq for Literal<'_> {
     fn eq(&self, other: &Self) -> bool {
         discriminant(self) == discriminant(other)
     }
 }
 
-impl TokenOrigin for ProcLit {
+impl TokenOrigin for Literal<'_> {
     fn origin(&self) -> Option<CompactString> {
         Some(match self {
-            ProcLit::Bool(bool) => bool.to_compact_string(),
-            ProcLit::Int(int) => int.to_compact_string(),
-            ProcLit::Float(float) => float.to_compact_string(),
+            Self::Bool(bool) => bool.to_compact_string(),
+            Self::Int(int) => int.to_compact_string(),
+            Self::Float(float) => float.to_compact_string(),
+            Self::Char(ch) => ch.to_compact_string(),
+            Self::Str(str) => str.to_compact_string(),
         })
     }
 }

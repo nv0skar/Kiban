@@ -274,27 +274,33 @@ impl<'i> Fragment<'i> {
                 continue;
             } else if let Some((content, span)) = self.consume_from("//") {
                 buffer.push(Token::new(
-                    TokenKind::Comment(CommentKind::Line, &content[2..]),
+                    TokenKind::Comment(Comment::new(CommentKind::Line, &content[2..])),
                     span,
                 ));
                 continue;
             } else if let Some((content, span)) = self.consume_from("/*") {
                 buffer.push(Token::new(
-                    TokenKind::Comment(CommentKind::Block, &content[2..content.len() - 2]),
+                    TokenKind::Comment(Comment::new(
+                        CommentKind::Block,
+                        &content[2..content.len() - 2],
+                    )),
                     span,
                 ));
                 continue;
             } else if let Some((content, span)) = self.consume_from("\'") {
-                buffer.push(Token::new(TokenKind::CharLit(&content[1..2]), span))
+                buffer.push(Token::new(
+                    TokenKind::Literal(Literal::Char(&content[1..2])),
+                    span,
+                ))
             } else if let Some((content, span)) = self.consume_from("\"") {
                 buffer.push(Token::new(
-                    TokenKind::StrLit(&content[1..content.len() - 1]),
+                    TokenKind::Literal(Literal::Str(&content[1..content.len() - 1])),
                     span,
                 ))
             } else if let Some(punc) = Punctuation::parse(self) {
                 buffer.push(punc);
                 continue;
-            } else if let Some(lit) = ProcLit::parse(self) {
+            } else if let Some(lit) = Literal::parse(self) {
                 buffer.push(lit);
                 continue;
             } else if let Some((id, span)) = self.consume_id() {

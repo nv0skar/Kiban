@@ -21,10 +21,8 @@ pub mod unary;
 use crate::*;
 
 use binary::*;
-use range::Range;
-use unary::Unary;
-
-use kiban_commons::*;
+use range::*;
+use unary::*;
 
 node! {
     #[doc = "Define expressions"]
@@ -39,7 +37,7 @@ node! {
             lhs: Expr,
             rhs: Expr,
         },
-        Literal(ProcLit),
+        Literal(Lit),
         Struct(Path, StructTy),
         Block(Block),
         Array(SVec<Expr>),

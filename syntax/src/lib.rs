@@ -23,7 +23,7 @@ pub mod r#const;
 pub mod expr;
 pub mod r#impl;
 pub mod item;
-pub mod literal;
+pub mod lit;
 pub mod stmt;
 pub mod sugar;
 pub mod r#type;
@@ -32,7 +32,7 @@ pub use atom::*;
 pub use body::*;
 pub use expr::*;
 pub use item::*;
-pub use literal::*;
+pub use lit::*;
 pub use r#const::*;
 pub use r#impl::*;
 pub use r#type::*;
@@ -40,7 +40,6 @@ pub use stmt::*;
 pub use sugar::*;
 
 use kiban_commons::*;
-use kiban_lexer::*;
 
 use compact_str::CompactString;
 
