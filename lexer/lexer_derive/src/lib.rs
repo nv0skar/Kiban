@@ -46,7 +46,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
             refs.extend(
                 TokenStream::from(quote! {
                     paste::paste! {
-                        pub const [<#field:snake:upper>]: crate::Token = crate::Token::#ident(#ident::#field);
+                        pub const [<#field:snake:upper>]: crate::TokenKind = crate::TokenKind::#ident(#ident::#field);
                     }
                 })
                 .into_iter(),
@@ -60,7 +60,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
             alts.extend(
                 TokenStream::from(quote! {
                     if let Some(span) = s.consume_pattern(#token) {
-                        return Some((crate::Token::#ident(Self::#field), span));
+                        return Some(crate::Token::new(crate::TokenKind::#ident(Self::#field), span));
                     }
                 })
                 .into_iter(),
@@ -72,7 +72,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
     let output = quote! {
         #refs
         impl crate::Lexeme for #ident {
-            fn parse(s: &mut crate::Fragment) -> Option<(crate::Token, kiban_commons::Span)> {
+            fn parse(s: &mut crate::Fragment) -> Option<crate::Token> {
                 #alts
                 None
             }

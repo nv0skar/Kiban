@@ -21,18 +21,18 @@ use rayon::prelude::*;
 
 /// Trait for parsable tokens
 pub trait Lexeme {
-    fn parse(s: &mut Fragment) -> Option<(Token, Span)>;
+    fn parse(s: &mut Fragment) -> Option<Token>;
 }
 
 /// Input type for the lexer that keeps track of the string's offset relative to the source
 #[derive(Clone, Default, Debug)]
-pub struct Input(SVec<Fragment>);
+pub struct Input<'i>(SVec<Fragment<'i>>);
 
 /// Input type for the lexer that keeps track of the string's offset relative to the source
-#[derive(Clone, Constructor, Default, Debug)]
-pub struct Fragment {
+#[derive(Copy, Clone, Constructor, Default, Debug)]
+pub struct Fragment<'i> {
     offset: usize,
-    inner: CompactString,
+    ptr: &'i str,
 }
 
 /// Describes the state of the input fragmentation process by keeping track of the kind of character it encounters
@@ -53,8 +53,8 @@ enum DefragResult {
     Continue,
 }
 
-impl Input {
-    pub fn new(input: &str) -> Self {
+impl<'i> Input<'i> {
+    pub fn new(input: &'i str) -> Self {
         Input::defragment(input)
     }
 
@@ -67,7 +67,7 @@ impl Input {
                         .par_iter()
                         .map(|s| s.clone().digest().to_vec())
                         .flatten()
-                        .collect::<Vec<(Token, Span)>>()
+                        .collect::<Vec<Token>>()
                         .into()
                 }
                 #[cfg(not(feature = "parallel"))]
@@ -76,33 +76,43 @@ impl Input {
                         .iter()
                         .map(|s| s.clone().digest())
                         .flatten()
-                        .collect::<SVec<(Token, Span)>>()
+                        .collect::<SVec<Token>>()
                 }
             },
             Option::default(),
         )
     }
 
-    fn defragment(input: &str) -> Self {
+    fn defragment(i: &'i str) -> Self {
         let (mut buffer, mut ctrl_flags): (SVec<Option<Fragment>>, DefragTracker) =
             (SVec::from_elem(None, 1), DefragTracker::default());
-        for (ch_offset, ch) in input.chars().enumerate() {
+        for (ch_offset, ch) in i.chars().enumerate() {
             let last_fragment = buffer.last_mut().unwrap();
             match ctrl_flags.can_defragment(ch) {
                 DefragResult::Defrag => buffer.push(None),
                 DefragResult::PushAndDefrag => {
                     if let Some(elem) = last_fragment {
-                        elem.inner.push(ch)
+                        elem.ptr = i
+                            .get(elem.offset.clone()..elem.offset + elem.ptr.len() + 1)
+                            .unwrap();
                     } else {
-                        *last_fragment = Some(Fragment::new(ch_offset, ch.to_compact_string()))
+                        *last_fragment = Some(Fragment::<'i>::new(
+                            ch_offset,
+                            i.get(ch_offset..ch_offset + 1).unwrap(),
+                        ))
                     }
                     buffer.push(None)
                 }
                 DefragResult::Continue => {
                     if let Some(elem) = last_fragment {
-                        elem.inner.push(ch)
+                        elem.ptr = i
+                            .get(elem.offset.clone()..elem.offset + elem.ptr.len() + 1)
+                            .unwrap();
                     } else {
-                        *last_fragment = Some(Fragment::new(ch_offset, ch.to_compact_string()))
+                        *last_fragment = Some(Fragment::<'i>::new(
+                            ch_offset,
+                            i.get(ch_offset..ch_offset + 1).unwrap(),
+                        ))
                     }
                 }
             }
@@ -163,22 +173,17 @@ impl DefragTracker {
     }
 }
 
-impl Fragment {
-    /// Check if there is any input left to consume
-    pub fn can_consume(&self) -> bool {
-        !self.inner.is_empty()
-    }
-
+impl<'i> Fragment<'i> {
     /// Consumes input
     fn take(&mut self, n: usize) {
         assert!(n != 0, "Cannot take 0 characters from input!");
         self.offset += n;
-        self.inner = self.inner.get(n..).unwrap().into();
+        self.ptr = self.ptr.get(n..).unwrap().into();
     }
 
     /// Consumes a specific character sequence
     pub fn consume_pattern(&mut self, txt: &str) -> Option<Span> {
-        if let (offset, Some(to_cmp)) = (self.offset, self.inner.get(..txt.len())) {
+        if let (offset, Some(to_cmp)) = (self.offset, self.ptr.get(..txt.len())) {
             if txt == to_cmp {
                 self.take(txt.len());
                 return Some(Span::new(offset, txt.len()));
@@ -188,11 +193,11 @@ impl Fragment {
     }
 
     /// Consumes all characters from a set of characters
-    pub fn consume_from(&mut self, txt: &str) -> Option<(CompactString, Span)> {
-        if let Some(to_cmp) = self.inner.get(..txt.len()) {
+    pub fn consume_from(&mut self, txt: &str) -> Option<(&'i str, Span)> {
+        if let Some(to_cmp) = self.ptr.get(..txt.len()) {
             if txt == to_cmp {
-                let rest = (self.inner.clone(), Span::new(self.offset, self.inner.len()));
-                self.take(self.inner.len());
+                let rest = (self.ptr.clone(), Span::new(self.offset, self.ptr.len()));
+                self.take(self.ptr.len());
                 return Some(rest);
             }
         }
@@ -200,9 +205,9 @@ impl Fragment {
     }
 
     /// Try to consume a number
-    pub fn consume_number(&mut self) -> Option<((bool, CompactString), Span)> {
+    pub fn consume_number(&mut self) -> Option<((bool, &'i str), Span)> {
         let (mut is_decimal, mut length) = (bool::default(), 0_usize);
-        for ch in self.inner.chars() {
+        for ch in self.ptr.chars() {
             if ch.is_numeric() {
                 length += 1;
             } else if ch == '.' {
@@ -217,13 +222,7 @@ impl Fragment {
         }
         if length != 0 {
             let number_span = Span::new(self.offset, length);
-            let res = Some((
-                (
-                    is_decimal,
-                    self.inner.get(..length).unwrap().to_compact_string(),
-                ),
-                number_span,
-            ));
+            let res = Some(((is_decimal, self.ptr.get(..length).unwrap()), number_span));
             self.take(length);
             res
         } else {
@@ -232,21 +231,24 @@ impl Fragment {
     }
 
     /// Try to consume an identifier
-    pub fn consume_id(&mut self) -> Option<(CompactString, Span)> {
-        let first_char = self.inner.chars().next().unwrap();
+    pub fn consume_id(&mut self) -> Option<(&'i str, Span)> {
+        let first_char = self.ptr.chars().next().unwrap();
         if !first_char.is_digit(10) && !first_char.is_whitespace() {
-            let mut buffer: SVec<char> = SVec::new();
-            for ch in self.inner.chars() {
+            let mut length = 0_usize;
+            for ch in self.ptr.chars() {
                 if ch.is_alphanumeric() || ch == '_' {
-                    buffer.push(ch)
+                    length += 1;
                 } else {
                     break;
                 }
             }
-            if !buffer.is_empty() {
-                let span_res = Span::new(self.offset, buffer.len());
-                self.take(buffer.len());
-                return Some((buffer.iter().collect(), span_res));
+            if length != 0 {
+                let res = (
+                    self.ptr.get(..length).unwrap(),
+                    Span::new(self.offset, length),
+                );
+                self.take(length);
+                return Some(res);
             }
         }
         None
@@ -254,15 +256,15 @@ impl Fragment {
 
     /// Consumes any character
     pub fn consume_any(&mut self) -> (char, Span) {
-        let (offset, any_char) = (self.offset, self.inner.chars().next().unwrap());
+        let (offset, any_char) = (self.offset, self.ptr.chars().next().unwrap());
         self.take(1);
         (any_char, Span::new(offset, 1))
     }
 
     /// Converts fragment to token stream
-    pub fn digest(&mut self) -> SVec<LocalisedToken> {
-        let mut buffer: SVec<LocalisedToken> = SVec::new();
-        while self.can_consume() {
+    pub fn digest(&mut self) -> SVec<Token> {
+        let mut buffer: SVec<Token> = SVec::new();
+        while !self.ptr.is_empty() {
             if let Some(kw) = Keyword::parse(self) {
                 buffer.push(kw);
                 continue;
@@ -276,13 +278,10 @@ impl Fragment {
                 buffer.push(lit);
                 continue;
             } else if let Some((id, span)) = self.consume_id() {
-                buffer.push((
-                    Token::Identifier(ArrayString::from(id.as_str()).unwrap()),
-                    span,
-                ));
+                buffer.push(Token::new(TokenKind::Identifier(id.into()), span));
             } else {
                 let (any_char, span) = self.consume_any();
-                buffer.push((Token::Unknown(any_char), span));
+                buffer.push(Token::new(TokenKind::Unknown(any_char), span));
                 continue;
             }
         }
@@ -290,8 +289,8 @@ impl Fragment {
     }
 }
 
-impl From<&str> for Input {
-    fn from(value: &str) -> Self {
+impl<'i> From<&'i str> for Input<'i> {
+    fn from(value: &'i str) -> Self {
         Input::defragment(value)
     }
 }

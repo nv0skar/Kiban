@@ -35,18 +35,18 @@ pub enum CommentType {
 }
 
 impl Lexeme for Comment {
-    fn parse(s: &mut Fragment) -> Option<(Token, Span)> {
+    fn parse(s: &mut Fragment) -> Option<Token> {
         if let Some((content, span)) = s.consume_from("//") {
-            Some((
-                Token::Comment(Self {
+            Some(Token::new(
+                TokenKind::Comment(Self {
                     typed: CommentType::Line,
                     content: ArrayString::from(content.get(2..).unwrap()).unwrap(),
                 }),
                 span,
             ))
         } else if let Some((content, span)) = s.consume_from("/*") {
-            Some((
-                Token::Comment(Self {
+            Some(Token::new(
+                TokenKind::Comment(Self {
                     typed: CommentType::Block,
                     content: ArrayString::from(content.get(2..content.len() - 2).unwrap()).unwrap(),
                 }),

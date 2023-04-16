@@ -33,26 +33,26 @@ pub enum Literal {
 }
 
 impl Lexeme for Literal {
-    fn parse(s: &mut Fragment) -> Option<(Token, Span)> {
+    fn parse(s: &mut Fragment) -> Option<Token> {
         if let Some(span) = s.consume_pattern("true") {
-            Some((Token::Literal(Self::Bool(true)), span))
+            Some(Token::new(TokenKind::Literal(Self::Bool(true)), span))
         } else if let Some(span) = s.consume_pattern("false") {
-            Some((Token::Literal(Self::Bool(false)), span))
+            Some(Token::new(TokenKind::Literal(Self::Bool(false)), span))
         } else if let Some((content, span)) = s.consume_from("\'") {
-            Some((
-                Token::Literal(Self::Char(content.chars().collect::<SVec<_>>()[1])),
+            Some(Token::new(
+                TokenKind::Literal(Self::Char(content.chars().collect::<SVec<_>>()[1])),
                 span,
             ))
         } else if let Some((content, span)) = s.consume_from("\"") {
-            Some((
-                Token::Literal(Self::Str(
+            Some(Token::new(
+                TokenKind::Literal(Self::Str(
                     ArrayString::from(&content[1..content.len() - 1]).unwrap(),
                 )),
                 span,
             ))
         } else if let Some(((is_decimal, number), span)) = s.consume_number() {
-            Some((
-                Token::Literal(if !is_decimal {
+            Some(Token::new(
+                TokenKind::Literal(if !is_decimal {
                     Self::Int(number.parse().unwrap())
                 } else {
                     Self::Float(number.parse().unwrap())

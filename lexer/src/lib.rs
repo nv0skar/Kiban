@@ -43,17 +43,21 @@ pub trait TokenOrigin {
 
 /// Token stream with recursive info
 #[derive(Clone, Constructor, Default, Debug)]
-pub struct TokenStream(SVec<LocalisedToken>, Option<usize>);
+pub struct TokenStream(SVec<Token>, Option<usize>);
 
 /// Localised token
-type LocalisedToken = (Token, Span);
+#[derive(Clone, Constructor, PartialEq, Debug)]
+pub struct Token {
+    kind: TokenKind,
+    location: Span,
+}
 
-/// Token variants
-#[derive(Copy, Clone, PartialEq, Display, Debug)]
+/// Token kinds
+#[derive(Clone, PartialEq, Display, Debug)]
 #[display(fmt = "{}")]
-pub enum Token {
+pub enum TokenKind {
     #[display(fmt = "{} (id)", _0)]
-    Identifier(ArrayString<1024>),
+    Identifier(CompactString),
     #[display(fmt = "{} (kw)", _0)]
     Keyword(Keyword),
     #[display(fmt = "{} (punct)", _0)]
@@ -70,8 +74,8 @@ impl Spanned for TokenStream {
     fn span(&self) -> Span {
         if let (Some(start), Some(end)) = (self.0.first(), self.0.last()) {
             Span::new(
-                *start.1.offset(),
-                (end.1.offset() + end.1.length()) - start.1.offset(),
+                *start.location.offset(),
+                (end.location.offset() + end.location.length()) - start.location.offset(),
             )
         } else {
             panic!("There is token stream to calculate span!")
@@ -91,13 +95,13 @@ impl PartialEq for TokenStream {
 
 impl PartialEq<Token> for TokenStream {
     fn eq(&self, t: &Token) -> bool {
-        if let Some((token, _)) = self.0.first() {
-            return ((discriminant(token) == discriminant(&t)) && {
+        if let Some(Token { kind: token, .. }) = self.0.first() {
+            return ((discriminant(token) == discriminant(&t.kind)) && {
                 match token {
-                    Token::Identifier(_) => true,
+                    TokenKind::Identifier(_) => true,
                     _ => false,
                 }
-            }) || token == t;
+            }) || *token == t.kind;
         } else {
             return false;
         }
@@ -105,7 +109,7 @@ impl PartialEq<Token> for TokenStream {
 }
 
 impl Iterator for TokenStream {
-    type Item = LocalisedToken;
+    type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.0.first().cloned();
@@ -116,7 +120,7 @@ impl Iterator for TokenStream {
     }
 }
 
-impl Into<TokenStream> for (Token, Span) {
+impl Into<TokenStream> for Token {
     fn into(self) -> TokenStream {
         TokenStream(SmallVec::from(vec![self]), None)
     }
@@ -125,14 +129,14 @@ impl Into<TokenStream> for (Token, Span) {
 impl From<TokenStream> for Token {
     fn from(value: TokenStream) -> Self {
         if value.0.len() == 1 {
-            value.0.first().unwrap().0.clone()
+            value.0.first().unwrap().clone()
         } else {
             panic!("Token streams with no or more than one token cannot be converted into tokens!")
         }
     }
 }
 
-impl TokenOrigin for Token {
+impl TokenOrigin for TokenKind {
     fn origin(&self) -> Option<CompactString> {
         match self {
             Self::Identifier(ident) => Some(ident.to_compact_string()),
@@ -152,7 +156,7 @@ impl Display for TokenStream {
             "{}",
             self.0
                 .iter()
-                .map(|s| format!("{} #{}", s.0, s.1))
+                .map(|s| format!("{} #{}", s.kind, s.location))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
