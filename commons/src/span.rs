@@ -18,13 +18,13 @@ use crate::*;
 
 use std::ops::Range;
 
+use chumsky::span::Span as ParserSpan;
 use getset::{Getters, MutGetters};
 use miette::SourceSpan;
 
 #[derive(Copy, Clone, PartialEq, Constructor, Getters, MutGetters, Display, Default, Debug)]
 #[display(fmt = "{}..+{}", offset, length)]
 #[get = "pub"]
-#[get_mut = "pub"]
 pub struct Span {
     offset: usize,
     length: usize,
@@ -41,6 +41,34 @@ impl Span {
 
     pub fn from_combination(start: Self, end: Self) -> Self {
         Self::new(start.offset, (end.offset + end.length) - start.offset)
+    }
+}
+
+impl ParserSpan for Span {
+    type Context = ();
+
+    type Offset = usize;
+
+    fn new(_: Self::Context, range: Range<Self::Offset>) -> Self {
+        Self::new(range.start, range.end - range.start)
+    }
+
+    fn context(&self) -> Self::Context {
+        ()
+    }
+
+    fn start(&self) -> Self::Offset {
+        self.offset
+    }
+
+    fn end(&self) -> Self::Offset {
+        self.offset + self.length
+    }
+}
+
+impl From<Range<usize>> for Span {
+    fn from(rng: Range<usize>) -> Self {
+        Self::new(rng.start, rng.end - rng.start)
     }
 }
 

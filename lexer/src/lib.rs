@@ -30,8 +30,13 @@ use kiban_commons::*;
 use kiban_lexer_derive::TokenParser;
 
 use core::panic;
-use std::{fmt::Display, mem::discriminant};
+use std::{
+    fmt::Display,
+    mem::discriminant,
+    ops::{Range, RangeFrom},
+};
 
+use chumsky::input::{Input as ParserInput, SliceInput, ValueInput};
 use compact_str::{CompactString, ToCompactString};
 use derive_more::{Constructor, Display};
 use smallvec::SmallVec;
@@ -116,6 +121,58 @@ impl<'i> Iterator for TokenStream<'i> {
             self.0.remove(0);
         };
         value
+    }
+}
+
+impl<'i> ParserInput<'i> for TokenStream<'i> {
+    type Offset = usize;
+    type Token = TokenKind<'i>;
+    type Span = Span;
+
+    fn start(&self) -> Self::Offset {
+        0
+    }
+
+    type TokenMaybe = TokenKind<'i>;
+
+    unsafe fn next_maybe(&self, offset: Self::Offset) -> (Self::Offset, Option<Self::TokenMaybe>) {
+        self.next(offset)
+    }
+
+    unsafe fn span(&self, rng: Range<Self::Offset>) -> Self::Span {
+        rng.into()
+    }
+
+    fn prev(offset: Self::Offset) -> Self::Offset {
+        offset.saturating_sub(1)
+    }
+}
+
+impl<'i> ValueInput<'i> for TokenStream<'i> {
+    unsafe fn next(&self, offset: Self::Offset) -> (Self::Offset, Option<Self::Token>) {
+        if let Some(Token { kind, .. }) = self.0.get(offset) {
+            (offset + 1, Some(*kind))
+        } else {
+            (offset, None)
+        }
+    }
+}
+
+impl<'i> SliceInput<'i> for TokenStream<'i> {
+    type Slice = TokenStream<'i>;
+
+    fn slice(&self, rng: Range<Self::Offset>) -> Self::Slice {
+        Self(
+            self.0.get(rng.clone()).unwrap().into(),
+            self.1.map(|offset| offset + rng.start),
+        )
+    }
+
+    fn slice_from(&self, from: RangeFrom<Self::Offset>) -> Self::Slice {
+        Self(
+            self.0.get(from.clone()).unwrap().into(),
+            self.1.map(|offset| offset + from.start),
+        )
     }
 }
 
