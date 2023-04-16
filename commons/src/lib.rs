@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod location;
+pub mod span;
 pub mod types;
 
-pub use location::*;
+pub use span::*;
 pub use types::*;
 
+use derive_more::{Constructor, Display};
 use smallbox::{space::S16, SmallBox};
 use smallvec::SmallVec;
 

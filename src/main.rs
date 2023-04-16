@@ -16,7 +16,6 @@
 
 #![allow(non_snake_case)]
 
-use kiban_ast::{expression::Expression, Parsable};
 use kiban_lexer::Input;
 
 use std::{ffi::OsString, fs};
@@ -27,8 +26,8 @@ use miette::Result;
 fn main() -> Result<()> {
     let lexed = Input::from("some_value = banana.juice").tokenize();
     println!("{}", lexed);
-    let parsed = Expression::parse(lexed.clone());
-    println!("{:#?}", parsed);
+    // let parsed = Expression::parse(lexed.clone());
+    // println!("{:#?}", parsed);
     Ok(())
 }
 

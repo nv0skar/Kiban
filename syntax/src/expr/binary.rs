@@ -14,25 +14,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
-
-#[derive(Clone, PartialEq, Display, Constructor, Debug)]
-#[display(fmt = "signed: {} & size: {}", signed, size)]
-pub struct Number {
-    signed: bool,
-    size: Size,
-}
-
-#[derive(Clone, PartialEq, Display, Debug)]
-pub enum Size {
-    _8,
-    _16,
-    _32,
-    _64,
-}
-
-impl Default for Number {
-    fn default() -> Self {
-        Self::new(false, Size::_8)
+node! {
+    #[doc = "Define binary operators"]
+    case Binary {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Exp,
+        Remainder,
+        LSht,
+        RSht,
+        Eq,
+        NotEq,
+        Gr,
+        Less,
+        GrEq,
+        LessEq,
+        And,
+        Or,
+        XOr,
     }
 }

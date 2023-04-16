@@ -14,25 +14,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Input;
-
-use kiban_commons::*;
+use crate::*;
 
 use derive_more::Constructor;
-use nom::{combinator::map, IResult};
+use rclite::Arc;
+
+/// Generic node type
+#[derive(Clone, PartialEq, Constructor, Debug)]
+pub struct Node<T> {
+    pub id: u32,
+    pub inner: Result<Arc<T>, ()>,
+    pub location: Span,
+}
 
 #[macro_export]
-macro_rules! node_def {
-    ($name:ident {$($fields:tt)*}) => {
+macro_rules! node {
+    ($(#[$meta:meta])* case $name:ident {$($variants:tt)*}) => {
         paste::paste! {
-            pub type $name = crate::node::Node<[<_ $name>]>;
+            $(#[$meta])*
+            pub type $name = $crate::node::Node<[<_ $name>]>;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum [<_ $name>] {
+                $($variants)*
+            }
+        }
+    };
+    ($(#[$meta:meta])* $name:ident {$($fields:tt)*}) => {
+        paste::paste! {
+            $(#[$meta])*
+            pub type $name = $crate::node::Node<[<_ $name>]>;
             #[derive(Clone, PartialEq, Debug)]
             pub struct [<_ $name>] {
                 $($fields)*
             }
         }
     };
-    ($name:ident ($($fields:tt)*)) => {
+    ($(#[$meta:meta])* $name:ident ($($fields:tt)*)) => {
         paste::paste! {
             pub type $name = crate::node::Node<[<_ $name>]>;
             #[derive(Clone, PartialEq, Debug)]
@@ -41,39 +58,4 @@ macro_rules! node_def {
             );
         }
     };
-}
-
-#[macro_export]
-macro_rules! node_variant {
-    ($name:ident {$($variants:tt)*}) => {
-        paste::paste! {
-            pub type $name = crate::node::Node<[<_ $name>]>;
-            #[derive(Clone, PartialEq, Debug)]
-            pub enum [<_ $name>] {
-                $($variants)*
-            }
-        }
-    };
-}
-
-#[derive(Clone, PartialEq, Constructor, Debug)]
-pub struct Node<T> {
-    pub inner: SBox<T>,
-    pub location: Span,
-}
-
-pub trait Parsable<T, A> {
-    fn parse(s: T) -> IResult<T, A>;
-}
-
-impl<T: Parsable<Input, (T, Span)>> Parsable<Input, Self> for Node<T> {
-    fn parse(s: Input) -> IResult<Input, Self> {
-        map(T::parse, |(s, span)| Node::new(SBox::new(s), span))(s)
-    }
-}
-
-impl<T> Into<Node<T>> for (T, Span) {
-    fn into(self) -> Node<T> {
-        Node::new(SBox::new(self.0), self.1)
-    }
 }

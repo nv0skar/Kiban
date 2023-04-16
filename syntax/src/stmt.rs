@@ -14,6 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#![allow(non_snake_case)]
+use crate::*;
 
-pub mod module;
+node! {
+    #[doc = "Define statements"]
+    case Stmt {
+        Item(Item),
+        Expression(Expr),
+        Semi(Expr),
+        Declare {
+            mutable: Mutable,
+            name: Ident,
+            ty: Type,
+            val: Option<Expr>,
+        },
+    }
+}

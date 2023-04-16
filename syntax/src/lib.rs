@@ -14,25 +14,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
+#[macro_use]
+pub mod node;
 
-#[derive(Clone, PartialEq, Display, Constructor, Debug)]
-#[display(fmt = "signed: {} & size: {}", signed, size)]
-pub struct Number {
-    signed: bool,
-    size: Size,
-}
+pub mod atom;
+pub mod body;
+pub mod r#const;
+pub mod expr;
+pub mod r#impl;
+pub mod item;
+pub mod literal;
+pub mod stmt;
+pub mod sugar;
+pub mod r#type;
 
-#[derive(Clone, PartialEq, Display, Debug)]
-pub enum Size {
-    _8,
-    _16,
-    _32,
-    _64,
-}
+pub use atom::*;
+pub use body::*;
+pub use expr::*;
+pub use item::*;
+pub use literal::*;
+pub use r#const::*;
+pub use r#impl::*;
+pub use r#type::*;
+pub use stmt::*;
+pub use sugar::*;
 
-impl Default for Number {
-    fn default() -> Self {
-        Self::new(false, Size::_8)
-    }
-}
+use kiban_commons::*;
+use kiban_lexer::*;
+
+use compact_str::CompactString;
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Syntax(SVec<Item>);

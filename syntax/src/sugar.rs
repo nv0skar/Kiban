@@ -16,23 +16,25 @@
 
 use crate::*;
 
-#[derive(Clone, PartialEq, Display, Constructor, Debug)]
-#[display(fmt = "signed: {} & size: {}", signed, size)]
-pub struct Number {
-    signed: bool,
-    size: Size,
-}
-
-#[derive(Clone, PartialEq, Display, Debug)]
-pub enum Size {
-    _8,
-    _16,
-    _32,
-    _64,
-}
-
-impl Default for Number {
-    fn default() -> Self {
-        Self::new(false, Size::_8)
+node! {
+    #[doc = "Define whether a name is public or private"]
+    case Visibility {
+        Private,
+        Public
     }
+}
+
+node! {
+    #[doc = "Define whether values in scope should be moved to closure"]
+    MoveScope(bool)
+}
+
+node! {
+    #[doc = "Define whether a value should be deferred when assigning"]
+    DerefValue(bool)
+}
+
+node! {
+    #[doc = "Define whether a definition is mutable"]
+    Mutable(bool)
 }

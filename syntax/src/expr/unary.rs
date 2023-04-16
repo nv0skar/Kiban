@@ -14,17 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod identified;
-pub mod import;
-
-use crate::{body::Body, literal::Literal, types::Types};
-
-use identified::Identified;
-use import::Import;
-
-node_variant! { Item {
-    Import(Import),
-    Constant(Identified<Literal>),
-    TypeAlias(Identified<Types>),
-    Function(Identified<Body>),
-}}
+node! {
+    #[doc = "Define unary operators"]
+    case Unary { Deref, Negative, Negation }
+}

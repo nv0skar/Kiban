@@ -16,23 +16,13 @@
 
 use crate::*;
 
-#[derive(Clone, PartialEq, Display, Constructor, Debug)]
-#[display(fmt = "signed: {} & size: {}", signed, size)]
-pub struct Number {
-    signed: bool,
-    size: Size,
-}
-
-#[derive(Clone, PartialEq, Display, Debug)]
-pub enum Size {
-    _8,
-    _16,
-    _32,
-    _64,
-}
-
-impl Default for Number {
-    fn default() -> Self {
-        Self::new(false, Size::_8)
+node! {
+    #[doc = "Define kind of literals"]
+    case Literal {
+        Bool(bool),
+        Int(usize),
+        Float(usize),
+        Char(char),
+        Str(CompactString)
     }
 }

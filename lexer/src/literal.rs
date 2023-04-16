@@ -16,26 +16,20 @@
 
 use crate::*;
 
-use kiban_commons::*;
-
 use std::mem::discriminant;
 
-use compact_str::CompactString;
-use derive_more::Display;
-
 /// Tokens that store a literal
-#[derive(Clone, Display, Debug)]
+#[derive(Copy, Clone, Display, Debug)]
 pub enum Literal {
     Bool(bool),
-    /// can be parsed into a literal or an identifier
-    #[display(fmt = "{} (integer / ident)", _0)]
+    #[display(fmt = "{} (integer)", _0)]
     Int(usize),
     #[display(fmt = "{} (float)", _0)]
     Float(f32),
     #[display(fmt = "{:?} (char)", _0)]
     Char(char),
-    #[display(fmt = "{:?} (string)", _0)]
-    String(CompactString),
+    #[display(fmt = "{:?} (str)", _0)]
+    Str(ArrayString<1024>),
 }
 
 impl Lexeme for Literal {
@@ -51,7 +45,9 @@ impl Lexeme for Literal {
             ))
         } else if let Some((content, span)) = s.consume_from("\"") {
             Some((
-                Token::Literal(Self::String(content[1..content.len() - 1].into())),
+                Token::Literal(Self::Str(
+                    ArrayString::from(&content[1..content.len() - 1]).unwrap(),
+                )),
                 span,
             ))
         } else if let Some(((is_decimal, number), span)) = s.consume_number() {
@@ -72,5 +68,17 @@ impl Lexeme for Literal {
 impl PartialEq for Literal {
     fn eq(&self, other: &Self) -> bool {
         discriminant(self) == discriminant(other)
+    }
+}
+
+impl TokenOrigin for Literal {
+    fn origin(&self) -> Option<CompactString> {
+        Some(match self {
+            Literal::Bool(bool) => bool.to_compact_string(),
+            Literal::Int(int) => int.to_compact_string(),
+            Literal::Float(float) => float.to_compact_string(),
+            Literal::Char(ch) => ch.to_compact_string(),
+            Literal::Str(str) => str.to_compact_string(),
+        })
     }
 }

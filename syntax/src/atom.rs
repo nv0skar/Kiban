@@ -16,23 +16,35 @@
 
 use crate::*;
 
-#[derive(Clone, PartialEq, Display, Constructor, Debug)]
-#[display(fmt = "signed: {} & size: {}", signed, size)]
-pub struct Number {
-    signed: bool,
-    size: Size,
+node!(
+    #[doc = "Holds an identifier"]
+    Ident(CompactString)
+);
+
+node! {
+    #[doc = "Define a path which is composed by an identifier, it's generics and an optional subpath"]
+    Path {
+        ident: Ident,
+        generics: Generics,
+        subpath: Option<Path>
+    }
 }
 
-#[derive(Clone, PartialEq, Display, Debug)]
-pub enum Size {
-    _8,
-    _16,
-    _32,
-    _64,
+node! {
+    #[doc = "Define generics of a type"]
+    Generics(SVec<GenericTypes>)
 }
 
-impl Default for Number {
-    fn default() -> Self {
-        Self::new(false, Size::_8)
+node! {
+    #[doc = "Define the lifetime of the type"]
+    Lifetime(Ident)
+}
+
+node! {
+    #[doc = "Define generics of a type"]
+    case GenericTypes {
+        Lifetime(Lifetime),
+        Name(Ident),
+        Type(Type)
     }
 }

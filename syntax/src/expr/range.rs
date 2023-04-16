@@ -14,10 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::generic::Identifier;
+use crate::*;
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct Identified<T> {
-    pub id: Identifier,
-    pub content: T,
+node! {
+    #[doc = "Define range expressions"]
+    case Range {
+        Bounded(Const, Const),
+        From(Const),
+        To(Const),
+        Inclusive(Const, Const),
+        ToInclusive(Const),
+        Full,
+    }
 }

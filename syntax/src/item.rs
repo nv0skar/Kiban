@@ -14,37 +14,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::ops::Range;
+use crate::*;
 
-use derive_more::{Constructor, Display};
-use getset::Getters;
-use miette::SourceSpan;
-
-#[derive(Clone, PartialEq, Constructor, Getters, Display, Debug)]
-#[display(fmt = "{}..+{}", offset, length)]
-#[get = "pub"]
-
-pub struct Span {
-    offset: usize,
-    length: usize,
-}
-
-pub trait Spanned {
-    fn span(&self) -> Span;
-}
-
-impl Span {
-    pub fn location(&self) -> Range<usize> {
-        self.offset..(self.offset + self.length)
-    }
-
-    pub fn from_combination(start: Self, end: Self) -> Self {
-        Self::new(start.offset, (end.offset + end.length) - start.offset)
+node! {
+    #[doc = "Define items"]
+    case Item {
+        Module(ModuleDef),
+        Import(ImportDef),
+        Const(ConstDef),
+        Type(TypeDef),
+        Impl(ImplDef),
+        Trait(TraitDef),
+        Func(FuncDef),
     }
 }
 
-impl Into<SourceSpan> for Span {
-    fn into(self) -> SourceSpan {
-        SourceSpan::new(self.offset.into(), self.length.into())
+node! {
+    #[doc = "Define module"]
+    ModuleDef {
+        vis: Visibility,
+        names: Ident
+    }
+}
+
+node! {
+    #[doc = "Define import"]
+    ImportDef {
+        vis: Visibility,
+        names: SVec<ImportName>
+    }
+}
+
+node! {
+    #[doc = "Define subimports"]
+    ImportName {
+        path: Path,
+        alias: Option<Ident>
     }
 }

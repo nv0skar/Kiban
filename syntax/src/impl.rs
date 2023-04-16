@@ -14,20 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{map_token, Input, Parsable};
+use crate::*;
 
-use kiban_commons::*;
-use kiban_lexer::*;
+node! {
+    #[doc = "Define implementations"]
+    ImplDef {
+        spec: Option<Path>,
+        name: Path,
+        funcs: SVec<FuncDef>
+    }
+}
 
-use nom::{branch::alt, IResult};
-
-node_variant! { Unary { Negative, Negation }}
-
-impl Parsable<Input, (Self, Span)> for _Unary {
-    fn parse(s: Input) -> IResult<Input, (Self, Span)> {
-        alt((
-            map_token!(LINE, Self::Negative),
-            map_token!(EXCLMTN, Self::Negation),
-        ))(s)
+node! {
+    #[doc = "Define traits"]
+    TraitDef {
+        name: Ident,
+        funcs: SVec<FuncDef>
     }
 }

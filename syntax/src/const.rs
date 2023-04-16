@@ -14,12 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::generic::Identifier;
+use crate::*;
 
-node_variant! { Import {
-    Name(Identifier),
-    As {
-        origin: Identifier,
-        name: Identifier,
-    },
-}}
+node! {
+    #[doc = "Define an anonymous constant"]
+    Const(Expr)
+}
+
+node! {
+    #[doc = "Define a constant"]
+    ConstDef {
+        vis: Visibility,
+        name: Ident,
+        ty: Type,
+        value: Const,
+    }
+}

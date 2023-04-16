@@ -16,14 +16,10 @@
 
 use crate::*;
 
-use kiban_commons::*;
-
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use compact_str::{CompactString, ToCompactString};
-use derive_more::Constructor;
-
+/// Trait for parsable tokens
 pub trait Lexeme {
     fn parse(s: &mut Fragment) -> Option<(Token, Span)>;
 }
@@ -63,7 +59,6 @@ impl Input {
     }
 
     pub fn tokenize(&self) -> TokenStream {
-        println!("{:#?}", self);
         TokenStream(
             {
                 #[cfg(feature = "parallel")]
@@ -173,6 +168,7 @@ impl Fragment {
     pub fn can_consume(&self) -> bool {
         !self.inner.is_empty()
     }
+
     /// Consumes input
     fn take(&mut self, n: usize) {
         assert!(n != 0, "Cannot take 0 characters from input!");
@@ -205,24 +201,31 @@ impl Fragment {
 
     /// Try to consume a number
     pub fn consume_number(&mut self) -> Option<((bool, CompactString), Span)> {
-        let (mut is_decimal, mut buffer) = (bool::default(), CompactString::default());
+        let (mut is_decimal, mut length) = (bool::default(), 0_usize);
         for ch in self.inner.chars() {
             if ch.is_numeric() {
-                buffer.push(ch);
+                length += 1;
             } else if ch == '.' {
                 if is_decimal {
                     return None;
                 }
                 is_decimal = true;
-                buffer.push(ch)
+                length += 1;
             } else {
                 break;
             }
         }
-        if !buffer.is_empty() {
-            let number_span = Span::new(self.offset, buffer.len());
-            self.take(buffer.len());
-            Some(((is_decimal, buffer), number_span))
+        if length != 0 {
+            let number_span = Span::new(self.offset, length);
+            let res = Some((
+                (
+                    is_decimal,
+                    self.inner.get(..length).unwrap().to_compact_string(),
+                ),
+                number_span,
+            ));
+            self.take(length);
+            res
         } else {
             None
         }
@@ -257,8 +260,8 @@ impl Fragment {
     }
 
     /// Converts fragment to token stream
-    pub fn digest(&mut self) -> _TokenStream {
-        let mut buffer: _TokenStream = SVec::new();
+    pub fn digest(&mut self) -> SVec<LocalisedToken> {
+        let mut buffer: SVec<LocalisedToken> = SVec::new();
         while self.can_consume() {
             if let Some(kw) = Keyword::parse(self) {
                 buffer.push(kw);
@@ -273,7 +276,10 @@ impl Fragment {
                 buffer.push(lit);
                 continue;
             } else if let Some((id, span)) = self.consume_id() {
-                buffer.push((Token::Identifier(id), span));
+                buffer.push((
+                    Token::Identifier(ArrayString::from(id.as_str()).unwrap()),
+                    span,
+                ));
             } else {
                 let (any_char, span) = self.consume_any();
                 buffer.push((Token::Unknown(any_char), span));

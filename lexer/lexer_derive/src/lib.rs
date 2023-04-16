@@ -21,8 +21,9 @@ use syn::{parse_macro_input, Data, DataEnum, DeriveInput, Expr};
 #[proc_macro_derive(TokenParser, attributes(token))]
 pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input);
-    let mut element_refs = quote! {};
-    let mut parser_alts = quote! {};
+    let mut refs = quote! {};
+    let mut repr = quote! {};
+    let mut alts = quote! {};
     if let Data::Enum(DataEnum { variants, .. }) = data {
         for variant in variants {
             let mut attrs = variant.attrs.iter();
@@ -42,7 +43,7 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
                     }
                 },
             );
-            element_refs.extend(
+            refs.extend(
                 TokenStream::from(quote! {
                     paste::paste! {
                         pub const [<#field:snake:upper>]: crate::Token = crate::Token::#ident(#ident::#field);
@@ -50,7 +51,13 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
                 })
                 .into_iter(),
             );
-            parser_alts.extend(
+            repr.extend(
+                TokenStream::from(quote! {
+                    Self::#field => #token,
+                })
+                .into_iter(),
+            );
+            alts.extend(
                 TokenStream::from(quote! {
                     if let Some(span) = s.consume_pattern(#token) {
                         return Some((crate::Token::#ident(Self::#field), span));
@@ -63,11 +70,22 @@ pub fn derive_token_parser(input: proc_macro::TokenStream) -> proc_macro::TokenS
         panic!("Token parser can only be derived on enums!")
     }
     let output = quote! {
-        #element_refs
+        #refs
         impl crate::Lexeme for #ident {
             fn parse(s: &mut crate::Fragment) -> Option<(crate::Token, kiban_commons::Span)> {
-                #parser_alts
+                #alts
                 None
+            }
+        }
+        impl crate::TokenOrigin for #ident {
+            fn origin(&self) -> Option<compact_str::CompactString> {
+                Some(
+                    compact_str::CompactString::from(
+                        match self {
+                            #repr
+                        }
+                    )
+                )
             }
         }
     };

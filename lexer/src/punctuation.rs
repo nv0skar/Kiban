@@ -14,11 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use kiban_lexer_derive::TokenParser;
+use crate::*;
 
-use derive_more::Display;
-
-#[derive(Clone, PartialEq, TokenParser, Display, Debug)]
+#[derive(Copy, Clone, PartialEq, TokenParser, Display, Debug)]
 pub enum Punctuation {
     #[token = "("]
     OpParen,
@@ -53,11 +51,13 @@ pub enum Punctuation {
     #[token = "^"]
     Caret,
     #[token = "%"]
-    Percent,
+    Perc,
     #[token = "&"]
-    Amprsnd,
+    Amp,
     #[token = "!"]
-    Exclmtn,
+    Exclm,
+    #[token = "'"]
+    Apos,
     #[token = ","]
     Comma,
     #[token = "."]

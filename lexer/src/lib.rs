@@ -27,35 +27,33 @@ pub use literal::*;
 pub use punctuation::*;
 
 use kiban_commons::*;
+use kiban_lexer_derive::TokenParser;
 
-use std::{
-    fmt::Display,
-    iter::Enumerate,
-    mem::discriminant,
-    ops::{Range, RangeFrom, RangeFull, RangeTo},
-};
+use core::panic;
+use std::{fmt::Display, mem::discriminant};
 
-use compact_str::CompactString;
+use arrayvec::ArrayString;
+use compact_str::{CompactString, ToCompactString};
 use derive_more::{Constructor, Display};
-use nom::{
-    Compare, CompareResult, FindSubstring, InputIter, InputLength, InputTake, Needed, Offset, Slice,
-};
-use nom_recursive::{HasRecursiveInfo, HasRecursiveType, RecursiveInfo};
 use smallvec::SmallVec;
+
+pub trait TokenOrigin {
+    fn origin(&self) -> Option<CompactString>;
+}
 
 /// Token stream with recursive info
 #[derive(Clone, Constructor, Default, Debug)]
-pub struct TokenStream(_TokenStream, Option<RecursiveInfo<_TokenStream>>);
+pub struct TokenStream(SVec<LocalisedToken>, Option<usize>);
 
-/// Token stream
-type _TokenStream = SVec<(Token, Span)>;
+/// Localised token
+type LocalisedToken = (Token, Span);
 
 /// Token variants
-#[derive(Clone, PartialEq, Display, Debug)]
+#[derive(Copy, Clone, PartialEq, Display, Debug)]
 #[display(fmt = "{}")]
 pub enum Token {
     #[display(fmt = "{} (id)", _0)]
-    Identifier(CompactString),
+    Identifier(ArrayString<1024>),
     #[display(fmt = "{} (kw)", _0)]
     Keyword(Keyword),
     #[display(fmt = "{} (punct)", _0)]
@@ -66,26 +64,6 @@ pub enum Token {
     Comment(Comment),
     #[display(fmt = "{} (unknown)", _0)]
     Unknown(char),
-}
-
-impl HasRecursiveInfo<_TokenStream> for TokenStream {
-    fn get_recursive_info(&self) -> RecursiveInfo<_TokenStream> {
-        match &self.1 {
-            Some(recursive) => recursive.clone(),
-            None => RecursiveInfo::new(),
-        }
-    }
-
-    fn set_recursive_info(mut self, info: RecursiveInfo<_TokenStream>) -> Self {
-        self.1 = Some(info);
-        self
-    }
-}
-
-impl HasRecursiveType<_TokenStream> for TokenStream {
-    fn get_value(&self) -> _TokenStream {
-        self.clone().0
-    }
 }
 
 impl Spanned for TokenStream {
@@ -111,8 +89,23 @@ impl PartialEq for TokenStream {
     }
 }
 
+impl PartialEq<Token> for TokenStream {
+    fn eq(&self, t: &Token) -> bool {
+        if let Some((token, _)) = self.0.first() {
+            return ((discriminant(token) == discriminant(&t)) && {
+                match token {
+                    Token::Identifier(_) => true,
+                    _ => false,
+                }
+            }) || token == t;
+        } else {
+            return false;
+        }
+    }
+}
+
 impl Iterator for TokenStream {
-    type Item = (Token, Span);
+    type Item = LocalisedToken;
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.0.first().cloned();
@@ -120,144 +113,6 @@ impl Iterator for TokenStream {
             self.0.remove(0);
         };
         value
-    }
-}
-
-impl InputLength for TokenStream {
-    #[inline]
-    fn input_len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl Slice<Range<usize>> for TokenStream {
-    #[inline]
-    fn slice(&self, range: Range<usize>) -> Self {
-        Self(self.0.as_slice().slice(range).into(), self.1.clone())
-    }
-}
-
-impl Slice<RangeTo<usize>> for TokenStream {
-    #[inline]
-    fn slice(&self, range: RangeTo<usize>) -> Self {
-        self.slice(0..range.end)
-    }
-}
-
-impl Slice<RangeFrom<usize>> for TokenStream {
-    #[inline]
-    fn slice(&self, range: RangeFrom<usize>) -> Self {
-        self.slice(range.start..self.0.len())
-    }
-}
-
-impl Slice<RangeFull> for TokenStream {
-    #[inline]
-    fn slice(&self, _: RangeFull) -> Self {
-        self.clone()
-    }
-}
-
-impl InputTake for TokenStream {
-    fn take(&self, count: usize) -> Self {
-        self.slice(0..count)
-    }
-
-    fn take_split(&self, count: usize) -> (Self, Self) {
-        (self.slice(count..), self.slice(..count))
-    }
-}
-
-impl Offset for TokenStream {
-    fn offset(&self, second: &Self) -> usize {
-        if let Some(target) = second.0.first() {
-            let mut offset = 0_usize;
-            for actual in &self.0 {
-                if actual == target {
-                    return offset;
-                }
-                offset += 1;
-            }
-            panic!("Cannot calculate offset!");
-        } else {
-            0
-        }
-    }
-}
-
-impl Compare<Token> for TokenStream {
-    fn compare(&self, t: Token) -> CompareResult {
-        if let Some((token, _)) = self.0.first() {
-            match ((discriminant(token) == discriminant(&t)) && {
-                match token {
-                    Token::Identifier(_) => true,
-                    _ => false,
-                }
-            }) || token == &t
-            {
-                true => CompareResult::Ok,
-                false => CompareResult::Error,
-            }
-        } else {
-            CompareResult::Incomplete
-        }
-    }
-
-    fn compare_no_case(&self, _t: Token) -> CompareResult {
-        panic!(
-            "Case insensitive comparisons aren't available as tokens aren't a stringified structure!"
-        )
-    }
-}
-
-impl FindSubstring<Token> for TokenStream {
-    fn find_substring(&self, substr: Token) -> Option<usize> {
-        for (index, (token, _)) in self.iter_indices() {
-            if token == substr {
-                return Some(index);
-            }
-        }
-        None
-    }
-}
-
-impl InputIter for TokenStream {
-    type Item = (Token, Span);
-    type Iter = Enumerate<TokenStream>;
-    type IterElem = TokenStream;
-
-    #[inline]
-    fn iter_indices(&self) -> Enumerate<Self> {
-        self.clone().enumerate()
-    }
-
-    #[inline]
-    fn iter_elements(&self) -> Self {
-        self.clone()
-    }
-
-    #[inline]
-    fn position<P>(&self, predicate: P) -> Option<usize>
-    where
-        P: Fn(Self::Item) -> bool,
-    {
-        self.0.clone().into_iter().position(predicate)
-    }
-
-    #[inline]
-    fn slice_index(&self, count: usize) -> Result<usize, Needed> {
-        if self.0.len() >= count {
-            Ok(count)
-        } else {
-            Err(Needed::Unknown)
-        }
-    }
-}
-
-impl InputLength for Token {
-    #[inline]
-    fn input_len(&self) -> usize {
-        1
     }
 }
 
@@ -273,6 +128,19 @@ impl From<TokenStream> for Token {
             value.0.first().unwrap().0.clone()
         } else {
             panic!("Token streams with no or more than one token cannot be converted into tokens!")
+        }
+    }
+}
+
+impl TokenOrigin for Token {
+    fn origin(&self) -> Option<CompactString> {
+        match self {
+            Self::Identifier(ident) => Some(ident.to_compact_string()),
+            Self::Keyword(kw) => kw.origin(),
+            Self::Punctuation(punc) => punc.origin(),
+            Self::Literal(lit) => lit.origin(),
+            Self::Comment(_) => None,
+            Self::Unknown(unknown) => Some(unknown.to_compact_string()),
         }
     }
 }

@@ -5,5 +5,7 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-miette = "5.5"
-thiserror = "1.0"
+kiban_commons = { path = "../commons" }
+compact_str = "0.7"
+miette = "5"
+thiserror = "1"

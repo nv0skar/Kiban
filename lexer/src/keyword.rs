@@ -14,17 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use kiban_lexer_derive::TokenParser;
+use crate::*;
 
-use derive_more::Display;
-
-#[derive(Clone, PartialEq, TokenParser, Display, Debug)]
+#[derive(Copy, Clone, PartialEq, TokenParser, Display, Debug)]
 pub enum Keyword {
-    /// Public declaration
+    /// Set declaration as public
     #[token = "pub"]
     Pub,
 
-    /// Imports declaration
+    /// Define a module
+    #[token = "mod"]
+    Mod,
+
+    /// Import other modules
     #[token = "use"]
     Use,
 
@@ -36,13 +38,41 @@ pub enum Keyword {
     #[token = "type"]
     Type,
 
+    /// Implement methods for a type
+    #[token = "impl"]
+    Impl,
+
+    /// Create a trait
+    #[token = "trait"]
+    Trait,
+
+    /// Refer to the type
+    #[token = "self"]
+    SelfTy,
+
+    /// Refer to self parameter
+    #[token = "self"]
+    SelfParam,
+
     /// Function declaration
     #[token = "fn"]
     Fn,
 
+    /// Move values into scope
+    #[token = "move"]
+    Move,
+
     /// Value declaration
     #[token = "let"]
     Let,
+
+    /// Flag declaration as mutable
+    #[token = "mut"]
+    Mut,
+
+    /// Match expression
+    #[token = "match"]
+    Match,
 
     /// Type casting
     #[token = "as"]
@@ -60,7 +90,7 @@ pub enum Keyword {
     #[token = "if"]
     If,
 
-    /// Condition not meeted
+    /// Condition not met
     #[token = "else"]
     Else,
 

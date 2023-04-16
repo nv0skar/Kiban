@@ -9,14 +9,11 @@ dependencies = [
  "clap",
  "derive_more",
  "getset",
- "kiban_ast",
  "kiban_commons",
  "kiban_error",
  "kiban_lexer",
+ "kiban_syntax",
  "miette",
- "nom",
- "nom-recursive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_locate",
 ]
 
 [[package]]
@@ -95,6 +92,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -131,10 +134,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
-name = "bytecount"
-version = "0.6.3"
+name = "branches"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c676a478f63e9fa2dd5368a42f28bba0d6c560b775f38583c8bbaa7fcd67c9c"
+checksum = "b4163c4e91c00c6f1e912ad1137e7f7f17a4e53cb68b6a2a0077b475e3397000"
 
 [[package]]
 name = "castaway"
@@ -391,33 +394,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
 
 [[package]]
-name = "kiban_ast"
-version = "0.0.1"
-dependencies = [
- "compact_str",
- "derive_more",
- "getset",
- "kiban_commons",
- "kiban_error",
- "kiban_lexer",
- "miette",
- "nom",
- "nom-recursive 0.5.0 (git+https://github.com/nv0skar/nom_recursive_without_pointers)",
- "nom_locate",
- "paste",
-]
-
-[[package]]
 name = "kiban_commons"
 version = "0.0.1"
 dependencies = [
  "derive_more",
  "getset",
  "miette",
- "nom",
- "nom-recursive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_locate",
- "paste",
  "smallbox",
  "smallvec",
 ]
@@ -426,6 +408,8 @@ dependencies = [
 name = "kiban_error"
 version = "0.0.1"
 dependencies = [
+ "compact_str",
+ "kiban_commons",
  "miette",
  "thiserror",
 ]
@@ -434,6 +418,7 @@ dependencies = [
 name = "kiban_lexer"
 version = "0.0.1"
 dependencies = [
+ "arrayvec",
  "compact_str",
  "derive_more",
  "getset",
@@ -441,8 +426,6 @@ dependencies = [
  "kiban_error",
  "kiban_lexer_derive",
  "miette",
- "nom",
- "nom-recursive 0.5.0 (git+https://github.com/nv0skar/nom_recursive_without_pointers)",
  "paste",
  "rayon",
  "smallvec",
@@ -456,6 +439,20 @@ dependencies = [
  "quote",
  "strum",
  "syn 2.0.13",
+]
+
+[[package]]
+name = "kiban_syntax"
+version = "0.0.1"
+dependencies = [
+ "compact_str",
+ "derive_more",
+ "getset",
+ "kiban_commons",
+ "kiban_error",
+ "kiban_lexer",
+ "paste",
+ "rclite",
 ]
 
 [[package]]
@@ -518,77 +515,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "minimal-lexical"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
-
-[[package]]
 name = "miniz_oxide"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b275950c28b37e794e8c55d88aeb5e139d0ce23fdbbeda68f8d7174abdf9e8fa"
 dependencies = [
  "adler",
-]
-
-[[package]]
-name = "nom"
-version = "7.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
-dependencies = [
- "memchr",
- "minimal-lexical",
-]
-
-[[package]]
-name = "nom-recursive"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63607196a460ae848e09fa10b62f20fda85328328b514b2dd97a2d700299ec63"
-dependencies = [
- "nom-recursive-macros 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "nom_locate",
-]
-
-[[package]]
-name = "nom-recursive"
-version = "0.5.0"
-source = "git+https://github.com/nv0skar/nom_recursive_without_pointers#dae5721e16a89d4fdaad8696a1838375790dc67f"
-dependencies = [
- "nom-recursive-macros 0.5.0 (git+https://github.com/nv0skar/nom_recursive_without_pointers)",
- "nom_locate",
-]
-
-[[package]]
-name = "nom-recursive-macros"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8621cd2fdc6201fb09c94264cef707fd20c392eaf5f1caaa26b01b8d9851888"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "nom-recursive-macros"
-version = "0.5.0"
-source = "git+https://github.com/nv0skar/nom_recursive_without_pointers#dae5721e16a89d4fdaad8696a1838375790dc67f"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "nom_locate"
-version = "4.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1e299bf5ea7b212e811e71174c5d1a5d065c4c0ad0c8691ecb1f97e3e66025e"
-dependencies = [
- "bytecount",
- "memchr",
- "nom",
 ]
 
 [[package]]
@@ -690,6 +622,15 @@ dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
  "num_cpus",
+]
+
+[[package]]
+name = "rclite"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e431d462d4c353c2714cd693240c98e73440821f0a1217718d554662258357ba"
+dependencies = [
+ "branches",
 ]
 
 [[package]]
