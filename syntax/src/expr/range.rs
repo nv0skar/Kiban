@@ -18,12 +18,12 @@ use crate::*;
 
 node! {
     #[doc = "Define range expressions"]
-    case Range {
-        Bounded(Const, Const),
-        From(Const),
-        To(Const),
-        Inclusive(Const, Const),
-        ToInclusive(Const),
+    case Range<'i> {
+        Bounded(Const<'i>, Const<'i>),
+        From(Const<'i>),
+        To(Const<'i>),
+        Inclusive(Const<'i>, Const<'i>),
+        ToInclusive(Const<'i>),
         Full,
     }
 }

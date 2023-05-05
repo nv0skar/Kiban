@@ -16,17 +16,10 @@
 
 use crate::*;
 
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
-
 /// Trait for parsable tokens
 pub trait Lexeme<'i> {
     fn parse(s: &mut Fragment) -> Option<Token<'i>>;
 }
-
-/// Input type for the lexer that keeps track of the string's offset relative to the source
-#[derive(Clone, Default, Debug)]
-pub struct Input<'i>(SVec<Fragment<'i>>);
 
 /// Input type for the lexer that keeps track of the string's offset relative to the source
 #[derive(Copy, Clone, Constructor, Default, Debug)]
@@ -41,83 +34,128 @@ struct DefragTracker {
     inner: [char; 2],
     lit_char: bool,
     lit_string: bool,
-    single_comment: bool,
-    delimited_comment: bool,
+    line_comment: bool,
+    block_comment: bool,
 }
 
 /// Decisition of the defragment tracker
 #[derive(Clone, Debug)]
 enum DefragResult {
-    Defrag,
-    PushAndDefrag,
-    Continue,
+    Digest,
+    Push,
+    LineComment,
+    BlockComment,
+    Ch,
+    Str,
 }
 
-impl<'i> Input<'i> {
+impl<'i> TokenStream<'i> {
     pub fn new(input: &'i str) -> Self {
-        Input::defragment(input)
-    }
-
-    pub fn tokenize(&mut self) -> TokenStream {
-        TokenStream(
-            {
-                #[cfg(feature = "parallel")]
-                {
-                    self.0
-                        .par_iter_mut()
-                        .map(|s| s.digest().to_vec())
-                        .flatten()
-                        .collect::<Vec<Token>>()
-                        .into()
-                }
-                #[cfg(not(feature = "parallel"))]
-                {
-                    self.0
-                        .iter_mut()
-                        .map(|s| s.digest())
-                        .flatten()
-                        .collect::<SVec<Token<'i>>>()
-                }
-            },
-            Option::default(),
-        )
+        TokenStream::defragment(input)
     }
 
     fn defragment(i: &'i str) -> Self {
-        let (mut buffer, mut ctrl_flags): (SVec<Option<Fragment>>, DefragTracker) =
-            (SVec::from_elem(None, 1), DefragTracker::default());
-        for (ch_offset, ch) in i.chars().enumerate() {
-            let last_fragment = buffer.last_mut().unwrap();
-            match ctrl_flags.can_defragment(ch) {
-                DefragResult::Defrag => buffer.push(None),
-                DefragResult::PushAndDefrag => {
-                    if let Some(elem) = last_fragment {
-                        elem.ptr = i
-                            .get(elem.offset.clone()..elem.offset + elem.ptr.len() + 1)
-                            .unwrap();
+        let (mut pool, token_buffer, mut fragment, mut ctrl_flags): (
+            _,
+            SegQueue<Token<'i>>,
+            Option<Fragment<'i>>,
+            DefragTracker,
+        ) = (
+            Pool::new(std::thread::available_parallelism().unwrap().get() as u32),
+            SegQueue::new(),
+            None,
+            DefragTracker::default(),
+        );
+        pool.scoped(|scope| {
+            let mut chars: std::iter::Enumerate<std::str::Chars> = i.chars().enumerate();
+            while chars.clone().count() != 0 || fragment.is_some() {
+                let (ch_offset, ch) = {
+                    if let Some(chars) = chars.next() {
+                        chars
                     } else {
-                        *last_fragment = Some(Fragment::<'i>::new(
-                            ch_offset,
-                            i.get(ch_offset..ch_offset + 1).unwrap(),
-                        ))
+                        if let Some(value) = fragment {
+                            let token_buffer = &token_buffer;
+                            scope.execute(move || {
+                                value.digest().iter().for_each(|s| token_buffer.push(*s));
+                            });
+                        }
+                        break;
                     }
-                    buffer.push(None)
-                }
-                DefragResult::Continue => {
-                    if let Some(elem) = last_fragment {
-                        elem.ptr = i
-                            .get(elem.offset.clone()..elem.offset + elem.ptr.len() + 1)
-                            .unwrap();
-                    } else {
-                        *last_fragment = Some(Fragment::<'i>::new(
-                            ch_offset,
-                            i.get(ch_offset..ch_offset + 1).unwrap(),
-                        ))
+                };
+                let _can_defragment = ctrl_flags.can_defragment(ch);
+                match _can_defragment {
+                    DefragResult::Push => {
+                        if let Some(value) = fragment.as_mut() {
+                            value.ptr = i
+                                .get(value.offset..value.offset + value.ptr.len() + 1)
+                                .unwrap();
+                        } else {
+                            fragment.replace(Fragment::<'i>::new(
+                                ch_offset,
+                                i.get(ch_offset..ch_offset + 1).unwrap(),
+                            ));
+                        }
+                    }
+                    DefragResult::Digest => {
+                        if let Some(value) = fragment.take() {
+                            let token_buffer = &token_buffer;
+                            scope.execute(move || {
+                                value.digest().iter().for_each(|s| token_buffer.push(*s));
+                            });
+                        }
+                    }
+                    _ => {
+                        if let Some(mut value) = fragment.take() {
+                            value.ptr = i
+                                .get(value.offset.clone()..value.offset + value.ptr.len() + 1)
+                                .unwrap();
+                            token_buffer.push(Token::new(
+                                {
+                                    match _can_defragment {
+                                        DefragResult::LineComment => {
+                                            TokenKind::Comment(Comment::new(
+                                                CommentKind::Line,
+                                                value.ptr.get(2..).unwrap(),
+                                            ))
+                                        }
+                                        DefragResult::BlockComment => {
+                                            TokenKind::Comment(Comment::new(
+                                                CommentKind::Block,
+                                                value.ptr.get(2..value.ptr.len() - 2).unwrap(),
+                                            ))
+                                        }
+                                        DefragResult::Ch => TokenKind::Literal(Literal::Char(
+                                            value.ptr.get(1..2).unwrap(),
+                                        )),
+                                        DefragResult::Str => TokenKind::Literal(Literal::Str(
+                                            value.ptr.get(1..value.ptr.len() - 1).unwrap(),
+                                        )),
+                                        _ => self::panic!(),
+                                    }
+                                },
+                                Span::new(value.offset, value.ptr.len()),
+                            ));
+                        } else {
+                            self::panic!(
+                                "Expected a possible token but there is no fragment in the buffer!"
+                            )
+                        }
                     }
                 }
             }
-        }
-        Self(buffer.iter().filter_map(|s| s.clone()).collect())
+        });
+        Self(
+            token_buffer
+                .into_iter()
+                .sorted_unstable_by(|lhs, rhs| match (lhs.span.offset(), rhs.span.offset()) {
+                    (lhs, rhs) if lhs > rhs => std::cmp::Ordering::Greater,
+                    (lhs, rhs) if lhs == rhs => std::cmp::Ordering::Equal,
+                    (lhs, rhs) if lhs < rhs => std::cmp::Ordering::Less,
+                    (_, _) => self::panic!(),
+                })
+                .collect::<SVec<Token<'i>>>(),
+            None,
+        )
     }
 }
 
@@ -125,50 +163,50 @@ impl DefragTracker {
     pub fn can_defragment(&mut self, ch: char) -> DefragResult {
         self.set_char(ch);
         match &self.inner {
-            ['/', '/'] => self.single_comment = true,
-            ['/', '*'] => self.delimited_comment = true,
+            ['/', '/'] => self.line_comment = true,
+            ['/', '*'] => self.block_comment = true,
             ['*', '/'] => {
-                self.delimited_comment = false;
-                return DefragResult::PushAndDefrag;
+                self.block_comment = false;
+                return DefragResult::BlockComment;
             }
             [_, '\''] => {
-                if self.lit_char {
-                    self.lit_char = false;
-                    return DefragResult::PushAndDefrag;
-                } else {
-                    if !self.lit_string {
+                if !self.line_comment {
+                    if self.lit_char {
+                        self.lit_char = false;
+                        return DefragResult::Ch;
+                    } else if !self.lit_string {
                         self.lit_char = true;
                     }
                 }
             }
             [_, '\"'] => {
-                if self.lit_string {
-                    self.lit_string = false;
-                    return DefragResult::PushAndDefrag;
-                } else {
-                    if !self.lit_char {
+                if !self.line_comment {
+                    if self.lit_string {
+                        self.lit_string = false;
+                        return DefragResult::Str;
+                    } else if !self.lit_char {
                         self.lit_string = true;
                     }
                 }
             }
             _ if ch == '\n' => {
-                self.single_comment = false;
-                if !self.lit_char && !self.lit_string && !self.delimited_comment {
-                    return DefragResult::Defrag;
+                if !self.lit_char && !self.lit_string && !self.block_comment {
+                    if self.line_comment {
+                        self.line_comment = false;
+                        return DefragResult::LineComment;
+                    } else {
+                        return DefragResult::Digest;
+                    }
                 }
             }
             _ if ch.is_whitespace() => {
-                if !self.single_comment
-                    && !self.delimited_comment
-                    && !self.lit_char
-                    && !self.lit_string
-                {
-                    return DefragResult::Defrag;
+                if !self.line_comment && !self.block_comment && !self.lit_char && !self.lit_string {
+                    return DefragResult::Digest;
                 }
             }
             _ => (),
         }
-        DefragResult::Continue
+        DefragResult::Push
     }
 
     pub fn set_char(&mut self, ch: char) {
@@ -178,6 +216,11 @@ impl DefragTracker {
 }
 
 impl<'i> Fragment<'i> {
+    /// Check if can be consumed from the fragment
+    pub fn can_consume(&self) -> bool {
+        !self.ptr.is_empty()
+    }
+
     /// Consumes input
     fn take(&mut self, n: usize) {
         assert!(n != 0, "Cannot take 0 characters from input!");
@@ -191,18 +234,6 @@ impl<'i> Fragment<'i> {
             if txt == to_cmp {
                 self.take(txt.len());
                 return Some(Span::new(offset, txt.len()));
-            }
-        }
-        None
-    }
-
-    /// Consumes all characters from a set of characters
-    pub fn consume_from(&mut self, txt: &str) -> Option<(&'i str, Span)> {
-        if let Some(to_cmp) = self.ptr.get(..txt.len()) {
-            if txt == to_cmp {
-                let rest = (self.ptr.clone(), Span::new(self.offset, self.ptr.len()));
-                self.take(self.ptr.len());
-                return Some(rest);
             }
         }
         None
@@ -258,55 +289,31 @@ impl<'i> Fragment<'i> {
         None
     }
 
-    /// Consumes any character
-    pub fn consume_any(&mut self) -> (char, Span) {
+    /// Consumes any character once
+    pub fn consume_any_once(&mut self) -> (char, Span) {
         let (offset, any_char) = (self.offset, self.ptr.chars().next().unwrap());
         self.take(1);
         (any_char, Span::new(offset, 1))
     }
 
     /// Converts fragment to token stream
-    pub fn digest(&mut self) -> SVec<Token> {
+    pub fn digest(&self) -> SVec<Token<'i>> {
+        let mut fragment = self.clone();
         let mut buffer: SVec<Token> = SVec::new();
-        while !self.ptr.is_empty() {
-            if let Some(kw) = Keyword::parse(self) {
+        while fragment.can_consume() {
+            if let Some(kw) = Keyword::parse(&mut fragment) {
                 buffer.push(kw);
                 continue;
-            } else if let Some((content, span)) = self.consume_from("//") {
-                buffer.push(Token::new(
-                    TokenKind::Comment(Comment::new(CommentKind::Line, &content[2..])),
-                    span,
-                ));
-                continue;
-            } else if let Some((content, span)) = self.consume_from("/*") {
-                buffer.push(Token::new(
-                    TokenKind::Comment(Comment::new(
-                        CommentKind::Block,
-                        &content[2..content.len() - 2],
-                    )),
-                    span,
-                ));
-                continue;
-            } else if let Some((content, span)) = self.consume_from("\'") {
-                buffer.push(Token::new(
-                    TokenKind::Literal(Literal::Char(&content[1..2])),
-                    span,
-                ))
-            } else if let Some((content, span)) = self.consume_from("\"") {
-                buffer.push(Token::new(
-                    TokenKind::Literal(Literal::Str(&content[1..content.len() - 1])),
-                    span,
-                ))
-            } else if let Some(punc) = Punctuation::parse(self) {
+            } else if let Some(punc) = Punctuation::parse(&mut fragment) {
                 buffer.push(punc);
                 continue;
-            } else if let Some(lit) = Literal::parse(self) {
+            } else if let Some(lit) = Literal::parse(&mut fragment) {
                 buffer.push(lit);
                 continue;
-            } else if let Some((id, span)) = self.consume_id() {
+            } else if let Some((id, span)) = fragment.consume_id() {
                 buffer.push(Token::new(TokenKind::Identifier(id), span));
             } else {
-                let (any_char, span) = self.consume_any();
+                let (any_char, span) = fragment.consume_any_once();
                 buffer.push(Token::new(TokenKind::Unknown(any_char), span));
                 continue;
             }
@@ -315,8 +322,8 @@ impl<'i> Fragment<'i> {
     }
 }
 
-impl<'i> From<&'i str> for Input<'i> {
+impl<'i> From<&'i str> for TokenStream<'i> {
     fn from(value: &'i str) -> Self {
-        Input::defragment(value)
+        TokenStream::defragment(value)
     }
 }

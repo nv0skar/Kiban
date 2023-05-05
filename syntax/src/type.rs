@@ -18,74 +18,74 @@ use crate::*;
 
 node! {
     #[doc = "Define types"]
-    case Type {
+    case Type<'i> {
         Null,
         Infer,
-        Paren(Type),
-        Ref(Option<Lifetime>, MutTy),
-        Ptr(MutTy),
-        Path(Path),
+        Paren(Type<'i>),
+        Ref(Option<Lifetime<'i>>, MutTy<'i>),
+        Ptr(MutTy<'i>),
+        Path(Path<'i>),
         Boolean,
         Integer(Number),
         Float(Number),
         Char,
-        Array(Type, Const),
-        Slice(Type),
-        Tup(TupTy),
-        Struct(StructTy),
-        Enum(EnumTy),
+        Array(Type<'i>, Const<'i>),
+        Slice(Type<'i>),
+        Tup(TupTy<'i>),
+        Struct(StructTy<'i>),
+        Enum(EnumTy<'i>),
         LocalSelf,
-        FnSig(Signature),
+        FnSig(Signature<'i>),
     }
 }
 
 node! {
     #[doc = "Define a type"]
-    TypeDef {
+    TypeDef<'i> {
         vis: Visibility,
-        name: Ident,
-        ty: Type,
+        name: Ident<'i>,
+        ty: Type<'i>,
     }
 }
 
 node! {
     #[doc = "Define a list of types"]
-    TupTy(SVec<Type>)
+    TupTy<'i>(SVec<Type<'i>>)
 }
 
 node! {
     #[doc = "Define structs"]
-    case StructTy {
-        Tup(TupTy),
-        Field(SVec<FieldTy>)
+    case StructTy<'i> {
+        Tup(TupTy<'i>),
+        Field(SVec<FieldTy<'i>>)
     }
 }
 
 node! {
     #[doc = "Define the field of structs"]
-    FieldTy {
-        name: Ident,
-        ty: Type
+    FieldTy<'i> {
+        name: Ident<'i>,
+        ty: Type<'i>
     }
 }
 
 node! {
     #[doc = "Defines enums"]
-    EnumTy(SVec<VariantTy>)
+    EnumTy<'i>(SVec<VariantTy<'i>>)
 }
 
 node! {
     #[doc = "Define enum variants"]
-    VariantTy {
-        name: Ident,
-        inner: Option<StructTy>
+    VariantTy<'i> {
+        name: Ident<'i>,
+        inner: Option<StructTy<'i>>
     }
 }
 
 node! {
     #[doc = "Defines if the type is mutable"]
-    MutTy {
+    MutTy<'i> {
         mutable: Mutable,
-        ty: Type
+        ty: Type<'i>
     }
 }

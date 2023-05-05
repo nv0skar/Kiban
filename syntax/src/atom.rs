@@ -18,33 +18,33 @@ use crate::*;
 
 node!(
     #[doc = "Holds an identifier"]
-    Ident(CompactString)
+    Ident<'i>(&'i str)
 );
 
 node! {
     #[doc = "Define a path which is composed by an identifier, it's generics and an optional subpath"]
-    Path {
-        ident: Ident,
-        generics: Generics,
-        subpath: Option<Path>
+    Path<'i> {
+        ident: Ident<'i>,
+        generics: Generics<'i>,
+        subpath: Option<Path<'i>>
     }
 }
 
 node! {
     #[doc = "Define generics of a type"]
-    Generics(SVec<GenericTypes>)
+    Generics<'i>(SVec<GenericTypes<'i>>)
 }
 
 node! {
     #[doc = "Define the lifetime of the type"]
-    Lifetime(Ident)
+    Lifetime<'i>(Ident<'i>)
 }
 
 node! {
     #[doc = "Define generics of a type"]
-    case GenericTypes {
-        Lifetime(Lifetime),
-        Name(Ident),
-        Type(Type)
+    case GenericTypes<'i> {
+        Lifetime(Lifetime<'i>),
+        Name(Ident<'i>),
+        Type(Type<'i>)
     }
 }

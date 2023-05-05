@@ -19,7 +19,7 @@ use kiban_commons::*;
 use compact_str::CompactString;
 use miette::Diagnostic;
 
-#[derive(thiserror::Error, Diagnostic, Debug)]
+#[derive(Clone, thiserror::Error, Diagnostic, PartialEq, Debug)]
 pub enum Error {
     #[error("Unexpected token {}", .found)]
     #[diagnostic(code(kiban::parser))]
@@ -28,6 +28,6 @@ pub enum Error {
         #[help]
         help: Option<CompactString>,
         #[label = "unexpected"]
-        location: Option<Span>,
+        span: Option<Span>,
     },
 }

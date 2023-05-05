@@ -18,46 +18,46 @@ use crate::*;
 
 node! {
     #[doc = "Define a sequence of statements"]
-    Block(SVec<Stmt>)
+    Block<'i>(SVec<Stmt<'i>>)
 }
 
 node! {
     #[doc = "Define all the posible closures a function may have"]
-    Variants(SVec<Closure>)
+    Variants<'i>(SVec<Closure<'i>>)
 }
 
 node! {
     #[doc = "Define a closure which has a signature and an (optional in traits) block"]
-    Closure {
-        sig: Signature,
-        block: Option<Block>,
+    Closure<'i> {
+        sig: Signature<'i>,
+        block: Option<Block<'i>>,
     }
 }
 
 node! {
     #[doc = "Define a closure signature which has generics, parameters and a return type"]
-    Signature {
-        generics: Generics,
-        params: Parameters,
-        expect: Type
+    Signature<'i> {
+        generics: Generics<'i>,
+        params: Parameters<'i>,
+        expect: Type<'i>
     }
 }
 
 node! {
     #[doc = "Define a named function"]
-    FuncDef {
+    FuncDef<'i> {
         visible: Visibility,
-        name: Ident,
-        variants: Variants
+        name: Ident<'i>,
+        variants: Variants<'i>
     }
 }
 
 node! {
     #[doc = "Define parameters which is a list of types"]
-    Parameters(SVec<Type>)
+    Parameters<'i>(SVec<Type<'i>>)
 }
 
 node! {
     #[doc = "Define arguments which is a list of expressions"]
-    Args(SVec<Expr>)
+    Args<'i>(SVec<Expr<'i>>)
 }

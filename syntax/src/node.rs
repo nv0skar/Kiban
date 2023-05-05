@@ -16,46 +16,89 @@
 
 use crate::*;
 
-use derive_more::Constructor;
-use rclite::Arc;
-
 /// Generic node type
-#[derive(Clone, PartialEq, Constructor, Debug)]
-pub struct Node<T> {
-    pub id: u32,
-    pub inner: Result<Arc<T>, ()>,
-    pub location: Span,
+#[derive(Clone, PartialEq, Debug)]
+pub struct Node<T>(Result<(Arc<T>, Span), Error>);
+
+impl<T> Node<T> {
+    pub fn new(inner: T, span: Span) -> Node<T> {
+        Node(Ok((Arc::new(inner), span)))
+    }
+
+    pub fn new_err(inner: Error) -> Node<T> {
+        Node(Err(inner))
+    }
 }
 
 #[macro_export]
 macro_rules! node {
-    ($(#[$meta:meta])* case $name:ident {$($variants:tt)*}) => {
+    ($(#[$meta:meta])* case $name:ident$(<$param:lifetime>)? {$($variants:tt)*} $($parser:block)?) => {
         paste::paste! {
             $(#[$meta])*
-            pub type $name = $crate::node::Node<[<_ $name>]>;
+            pub type $name$(< $param >)? = $crate::node::Node<[<_ $name>] $(< $param >)? >;
             #[derive(Clone, PartialEq, Debug)]
-            pub enum [<_ $name>] {
+            pub enum [<_ $name>] $(< $param >)? {
                 $($variants)*
             }
+            $(
+                pub fn [<_ $name:lower>]<'i>() -> impl chumsky::Parser<'i, kiban_lexer::TokenStream<'i>, $name<'i>, chumsky::extra::Err<Node<$name<'i>>>> {
+                    $parser
+                }
+            )?
         }
     };
-    ($(#[$meta:meta])* $name:ident {$($fields:tt)*}) => {
+    ($(#[$meta:meta])* $name:ident$(<$param:lifetime>)? {$($fields:tt)*}$($parser:block)?) => {
         paste::paste! {
             $(#[$meta])*
-            pub type $name = $crate::node::Node<[<_ $name>]>;
+            pub type $name$(< $param >)? = $crate::node::Node<[<_ $name>] $(< $param >)? >;
             #[derive(Clone, PartialEq, Debug)]
-            pub struct [<_ $name>] {
+            pub struct [<_ $name>] $(< $param >)?{
                 $($fields)*
             }
+            $(
+                pub fn [<_ $name:lower>]<'i>() -> impl chumsky::Parser<'i, kiban_lexer::TokenStream<'i>, $name<'i>, chumsky::extra::Err<Node<$name<'i>>>> $parser
+            )?
         }
     };
-    ($(#[$meta:meta])* $name:ident ($($fields:tt)*)) => {
+    ($(#[$meta:meta])* $name:ident$(<$param:lifetime>)? ($($fields:tt)*) $($parser:block)?) => {
         paste::paste! {
-            pub type $name = crate::node::Node<[<_ $name>]>;
+            pub type $name $(< $param >)? = crate::node::Node<[<_ $name>] $(< $param >)? >;
             #[derive(Clone, PartialEq, Debug)]
-            pub struct [<_ $name>](
+            pub struct [<_ $name>] $(< $param >)? (
                 $($fields)*
             );
+            $(
+                pub fn [<_ $name:lower>]<'i>() -> impl chumsky::Parser<'i, kiban_lexer::TokenStream<'i>, $name<'i>, chumsky::extra::Err<Node<$name<'i>>>> $parser
+            )?
         }
     };
+}
+
+impl<'i, T> chumsky::error::Error<'i, TokenStream<'i>> for Node<T> {
+    fn expected_found<
+        E: IntoIterator<
+            Item = Option<MaybeRef<'i, <TokenStream<'i> as chumsky::prelude::Input<'i>>::Token>>,
+        >,
+    >(
+        expected: E,
+        found: Option<MaybeRef<'i, <TokenStream<'i> as chumsky::prelude::Input<'i>>::Token>>,
+        span: <TokenStream<'i> as chumsky::prelude::Input<'i>>::Span,
+    ) -> Self {
+        Self(Err(Error::Parser {
+            found: found.unwrap().origin().unwrap(),
+            help: {
+                let mut ret: Option<CompactString> = None;
+                expected.into_iter().for_each(|s| {
+                    let token = s.unwrap().origin().unwrap();
+                    if let Some(ret_content) = &mut ret {
+                        ret_content.push_str(token.as_str())
+                    } else {
+                        ret = Some(token)
+                    }
+                });
+                ret
+            },
+            span: Some(span),
+        }))
+    }
 }

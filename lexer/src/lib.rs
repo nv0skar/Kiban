@@ -38,7 +38,10 @@ use std::{
 
 use chumsky::input::{Input as ParserInput, SliceInput, ValueInput};
 use compact_str::{CompactString, ToCompactString};
+use crossbeam::queue::SegQueue;
 use derive_more::{Constructor, Display};
+use itertools::Itertools;
+use scoped_threadpool::Pool;
 use smallvec::SmallVec;
 
 pub trait TokenOrigin {
@@ -46,14 +49,14 @@ pub trait TokenOrigin {
 }
 
 /// Token stream with recursive info
-#[derive(Clone, Constructor, Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct TokenStream<'i>(SVec<Token<'i>>, Option<usize>);
 
 /// Localised token
-#[derive(Clone, Constructor, PartialEq, Debug)]
+#[derive(Copy, Clone, Constructor, PartialEq, Debug)]
 pub struct Token<'i> {
     kind: TokenKind<'i>,
-    location: Span,
+    span: Span,
 }
 
 /// Token kinds
@@ -78,8 +81,8 @@ impl Spanned for TokenStream<'_> {
     fn span(&self) -> Span {
         if let (Some(start), Some(end)) = (self.0.first(), self.0.last()) {
             Span::new(
-                *start.location.offset(),
-                (end.location.offset() + end.location.length()) - start.location.offset(),
+                *start.span.offset(),
+                (end.span.offset() + end.span.length()) - start.span.offset(),
             )
         } else {
             panic!("There is token stream to calculate span!")
@@ -140,7 +143,11 @@ impl<'i> ParserInput<'i> for TokenStream<'i> {
     }
 
     unsafe fn span(&self, rng: Range<Self::Offset>) -> Self::Span {
-        rng.into()
+        let _start_token = self.0.get(rng.start).unwrap();
+        Span::from_combination(
+            _start_token.span,
+            self.0.get(rng.end).unwrap_or(_start_token).span,
+        )
     }
 
     fn prev(offset: Self::Offset) -> Self::Offset {
@@ -162,14 +169,14 @@ impl<'i> SliceInput<'i> for TokenStream<'i> {
     type Slice = TokenStream<'i>;
 
     fn slice(&self, rng: Range<Self::Offset>) -> Self::Slice {
-        Self(
+        TokenStream(
             self.0.get(rng.clone()).unwrap().into(),
             self.1.map(|offset| offset + rng.start),
         )
     }
 
     fn slice_from(&self, from: RangeFrom<Self::Offset>) -> Self::Slice {
-        Self(
+        TokenStream(
             self.0.get(from.clone()).unwrap().into(),
             self.1.map(|offset| offset + from.start),
         )
@@ -212,7 +219,7 @@ impl<'i> Display for TokenStream<'i> {
             "{}",
             self.0
                 .iter()
-                .map(|s| format!("{} #{}", s.kind, s.location))
+                .map(|s| format!("{} #{}", s.kind, s.span))
                 .collect::<Vec<String>>()
                 .join(", ")
         )

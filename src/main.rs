@@ -16,19 +16,20 @@
 
 #![allow(non_snake_case)]
 
-use kiban_lexer::Input;
+use kiban_lexer::TokenStream;
+use kiban_syntax::*;
 
 use std::{ffi::OsString, fs};
 
+use chumsky::prelude::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use miette::Result;
 
 fn main() -> Result<()> {
-    let mut input =
-        Input::from("some_val = orange.juice; other_val = \"I like orange juice!\" // Hello!");
-    println!("{}", input.tokenize());
-    // let parsed = Expression::parse(lexed.clone());
-    // println!("{:#?}", parsed);
+    let input = TokenStream::from("/* hello world! */");
+    println!("{}", input);
+    let parsed = _literal().parse(input);
+    println!("{:?}", parsed);
     Ok(())
 }
 

@@ -18,37 +18,37 @@ use crate::*;
 
 node! {
     #[doc = "Define items"]
-    case Item {
-        Module(ModuleDef),
-        Import(ImportDef),
-        Const(ConstDef),
-        Type(TypeDef),
-        Impl(ImplDef),
-        Trait(TraitDef),
-        Func(FuncDef),
+    case Item<'i> {
+        Module(ModuleDef<'i>),
+        Import(ImportDef<'i>),
+        Const(ConstDef<'i>),
+        Type(TypeDef<'i>),
+        Impl(ImplDef<'i>),
+        Trait(TraitDef<'i>),
+        Func(FuncDef<'i>),
     }
 }
 
 node! {
     #[doc = "Define module"]
-    ModuleDef {
+    ModuleDef<'i> {
         vis: Visibility,
-        names: Ident
+        names: Ident<'i>
     }
 }
 
 node! {
     #[doc = "Define import"]
-    ImportDef {
+    ImportDef<'i> {
         vis: Visibility,
-        names: SVec<ImportName>
+        names: SVec<ImportName<'i>>
     }
 }
 
 node! {
     #[doc = "Define subimports"]
-    ImportName {
-        path: Path,
-        alias: Option<Ident>
+    ImportName<'i> {
+        path: Path<'i>,
+        alias: Option<Ident<'i>>
     }
 }

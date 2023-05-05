@@ -26,48 +26,48 @@ use unary::*;
 
 node! {
     #[doc = "Define expressions"]
-    case Expr {
-        Path(Path),
+    case Expr<'i> {
+        Path(Path<'i>),
         Underscore,
-        Parenthesized(Expr),
-        Refer(Expr),
-        Unary(Unary, Expr),
+        Parenthesized(Expr<'i>),
+        Refer(Expr<'i>),
+        Unary(Unary, Expr<'i>),
         Binary {
             op: Binary,
-            lhs: Expr,
-            rhs: Expr,
+            lhs: Expr<'i>,
+            rhs: Expr<'i>,
         },
-        Literal(Lit),
-        Struct(Path, StructTy),
-        Block(Block),
-        Array(SVec<Expr>),
-        Tup(TupExpr),
-        Closure(MoveScope ,Closure),
-        Range(Range),
-        Assign(DerefValue, Ident, Option<Binary>, Expr),
-        Field(Expr, Ident),
-        Call(Expr, Args),
+        Literal(Literal<'i>),
+        Struct(Path<'i>, StructTy<'i>),
+        Block(Block<'i>),
+        Array(SVec<Expr<'i>>),
+        Tup(TupExpr<'i>),
+        Closure(MoveScope ,Closure<'i>),
+        Range(Range<'i>),
+        Assign(DerefValue, Ident<'i>, Option<Binary>, Expr<'i>),
+        Field(Expr<'i>, Ident<'i>),
+        Call(Expr<'i>, Args<'i>),
         Method {
-            def: Expr,
-            method: Path,
-            args: Args,
+            def: Expr<'i>,
+            method: Path<'i>,
+            args: Args<'i>,
         },
-        Index(Expr, Expr),
-        Cast(Expr, Type),
+        Index(Expr<'i>, Expr<'i>),
+        Cast(Expr<'i>, Type<'i>),
         Cond {
-            check: Expr,
-            then: Expr,
-            not: Option<Expr>,
+            check: Expr<'i>,
+            then: Expr<'i>,
+            not: Option<Expr<'i>>,
         },
-        Loop(Expr),
+        Loop(Expr<'i>),
         ForLoop {
-            item: Ident,
-            iter: Expr,
-            block: Expr,
+            item: Ident<'i>,
+            iter: Expr<'i>,
+            block: Expr<'i>,
         },
         While {
-            check: Expr,
-            block: Expr,
+            check: Expr<'i>,
+            block: Expr<'i>,
         },
         Continue,
         Break,
@@ -76,29 +76,29 @@ node! {
 
 node! {
     #[doc = "Define a list of expressions"]
-    TupExpr(SVec<Expr>)
+    TupExpr<'i>(SVec<Expr<'i>>)
 }
 
 node! {
     #[doc = "Define struct constructor"]
-    case StructExpr {
-        Tup(TupExpr),
-        Field(SVec<FieldExpr>)
+    case StructExpr<'i> {
+        Tup(TupExpr<'i>),
+        Field(SVec<FieldExpr<'i>>)
     }
 }
 
 node! {
     #[doc = "Define constructor of fields"]
-    FieldExpr {
-        path: Path,
-        expr: Expr
+    FieldExpr<'i> {
+        path: Path<'i>,
+        expr: Expr<'i>
     }
 }
 
 node! {
     #[doc = "Defines if the expression is mutable"]
-    MutExpr {
+    MutExpr<'i> {
         mutable: Mutable,
-        expr: Expr
+        expr: Expr<'i>
     }
 }

@@ -35,7 +35,7 @@ pub trait Spanned {
 }
 
 impl Span {
-    pub fn location(&self) -> Range<usize> {
+    pub fn range(&self) -> Range<usize> {
         self.offset..(self.offset + self.length)
     }
 

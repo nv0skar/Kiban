@@ -8,6 +8,7 @@ edition = "2021"
 kiban_commons = { path = "../commons" }
 kiban_lexer = { path = "../lexer" }
 kiban_error = { path = "../error" }
+chumsky = "1.0.0-alpha.3"
 rclite = "0.2"
 compact_str = "0.7"
 paste = "1.0"

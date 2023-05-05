@@ -4,17 +4,14 @@ description = "Kiban's lexer 🪨"
 version = "0.0.1"
 edition = "2021"
 
-[features]
-default = ["parallel"]
-parallel = []
-
 [dependencies]
 kiban_commons = { path = "../commons" }
-kiban_error = { path = "../error" }
 kiban_lexer_derive = { path = "./lexer_derive" }
-rayon = "1.7"
-chumsky = "1.0.0-alpha.3"
+itertools = "0.10"
+crossbeam = "0.8"
 smallvec = "1.10"
+chumsky = "1.0.0-alpha.3"
+scoped_threadpool = "0.1.9"
 compact_str = "0.7"
 derive_more = "0.99"
 getset = "0.1"

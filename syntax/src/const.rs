@@ -18,15 +18,15 @@ use crate::*;
 
 node! {
     #[doc = "Define an anonymous constant"]
-    Const(Expr)
+    Const<'i>(Expr<'i>)
 }
 
 node! {
     #[doc = "Define a constant"]
-    ConstDef {
+    ConstDef<'i> {
         vis: Visibility,
-        name: Ident,
-        ty: Type,
-        value: Const,
+        name: Ident<'i>,
+        ty: Type<'i>,
+        value: Const<'i>,
     }
 }

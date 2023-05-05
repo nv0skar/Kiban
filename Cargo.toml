@@ -9,7 +9,7 @@ kiban_commons = { path = "./commons" }
 kiban_syntax = { path = "./syntax" }
 kiban_lexer = { path = "./lexer" }
 kiban_error = { path = "./error" }
-
+chumsky = "1.0.0-alpha.3"
 derive_more = "0.99"
 getset = "0.1.2"
 clap = { version = "4.1", features = ["string"]}

@@ -18,15 +18,15 @@ use crate::*;
 
 node! {
     #[doc = "Define statements"]
-    case Stmt {
-        Item(Item),
-        Expression(Expr),
-        Semi(Expr),
+    case Stmt<'i> {
+        Item(Item<'i>),
+        Expression(Expr<'i>),
+        Semi(Expr<'i>),
         Declare {
             mutable: Mutable,
-            name: Ident,
-            ty: Type,
-            val: Option<Expr>,
+            name: Ident<'i>,
+            ty: Type<'i>,
+            val: Option<Expr<'i>>,
         },
     }
 }

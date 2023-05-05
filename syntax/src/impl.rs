@@ -18,17 +18,17 @@ use crate::*;
 
 node! {
     #[doc = "Define implementations"]
-    ImplDef {
-        spec: Option<Path>,
-        name: Path,
-        funcs: SVec<FuncDef>
+    ImplDef<'i> {
+        spec: Option<Path<'i>>,
+        name: Path<'i>,
+        funcs: SVec<FuncDef<'i>>
     }
 }
 
 node! {
     #[doc = "Define traits"]
-    TraitDef {
-        name: Ident,
-        funcs: SVec<FuncDef>
+    TraitDef<'i> {
+        name: Ident<'i>,
+        funcs: SVec<FuncDef<'i>>
     }
 }
